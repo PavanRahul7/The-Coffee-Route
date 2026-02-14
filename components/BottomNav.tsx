@@ -18,6 +18,15 @@ const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onTabChange }) => {
       ) 
     },
     { 
+      id: 'friends', 
+      label: 'Friends', 
+      icon: (active) => (
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+        </svg>
+      ) 
+    },
+    { 
       id: 'clubs', 
       label: 'Clubs', 
       icon: (active) => (
@@ -57,14 +66,14 @@ const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onTabChange }) => {
 
   return (
     <div className="fixed bottom-10 left-0 right-0 z-50 px-6 flex justify-center pointer-events-none">
-      <nav className="glass max-w-xl w-full rounded-[2.5rem] px-4 py-3 flex justify-around items-center pointer-events-auto shadow-2xl">
+      <nav className="glass max-w-2xl w-full rounded-[2.5rem] px-4 py-3 flex justify-around items-center pointer-events-auto shadow-2xl overflow-x-auto">
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
           return (
             <button
               key={tab.id}
               onClick={() => onTabChange(tab.id)}
-              className={`relative flex flex-col items-center justify-center py-2 px-4 sm:px-6 rounded-3xl transition-all duration-300 btn-active ${
+              className={`relative flex flex-col items-center justify-center py-2 px-3 sm:px-4 rounded-3xl transition-all duration-300 btn-active min-w-[60px] ${
                 isActive ? 'scale-110' : 'opacity-40 hover:opacity-100'
               }`}
             >
@@ -74,7 +83,7 @@ const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onTabChange }) => {
               >
                 {tab.icon(isActive)}
               </div>
-              <span className={`text-[9px] mt-1 font-extrabold uppercase tracking-widest transition-opacity duration-300 ${isActive ? 'opacity-100' : 'opacity-0'}`}>
+              <span className={`text-[8px] mt-1 font-extrabold uppercase tracking-widest transition-opacity duration-300 ${isActive ? 'opacity-100' : 'opacity-0'}`}>
                 {tab.label}
               </span>
               {isActive && (

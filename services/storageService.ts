@@ -6,6 +6,7 @@ const KEYS = {
   PROFILE: 'velocity_profile',
   CLUBS: 'velocity_clubs',
   REVIEWS: 'velocity_reviews',
+  USERS: 'velocity_all_users', // For simulated discovery
 };
 
 const INITIAL_PROFILE: UserProfile = {
@@ -14,6 +15,7 @@ const INITIAL_PROFILE: UserProfile = {
   avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&h=400&fit=crop',
   bio: 'Just starting my journey. Every run deserves a destination.',
   joinedClubIds: [],
+  friendIds: ['u_2', 'u_3'], // Start with some friends
   isSetup: false,
   stats: {
     totalDistance: 0,
@@ -22,69 +24,43 @@ const INITIAL_PROFILE: UserProfile = {
   }
 };
 
-const INITIAL_ROUTES: Route[] = [
+const DISCOVERY_USERS: UserProfile[] = [
   {
-    id: 'r1',
-    name: 'Espresso Harbor Run',
-    description: 'A crisp coastal loop ending at The Roastery for a perfect double shot.',
-    creatorId: 'user_1',
-    creatorName: 'CaffeineRunner',
-    path: [{ lat: 37.7749, lng: -122.4194 }, { lat: 37.7849, lng: -122.4094 }],
-    distance: 5.2,
-    elevationGain: 12,
-    difficulty: Difficulty.EASY,
-    tags: ['coffee', 'scenic', 'flat'],
-    createdAt: Date.now(),
-    rating: 4.8
+    id: 'u_2',
+    username: 'EspressoEnthusiast',
+    avatar: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=200&h=200&fit=crop',
+    bio: 'Pacing for the perfect crema.',
+    joinedClubIds: ['c1'],
+    friendIds: [],
+    isSetup: true,
+    stats: { totalDistance: 142, totalRuns: 28, avgPace: '5:12' }
   },
   {
-    id: 'r2',
-    name: 'Cortado Hill Climb',
-    description: 'Tough elevation gains rewarding you with the best micro-foam in the city.',
-    creatorId: 'user_1',
-    creatorName: 'CaffeineRunner',
-    path: [{ lat: 37.7949, lng: -122.4294 }, { lat: 37.8049, lng: -122.4394 }],
-    distance: 8.4,
-    elevationGain: 245,
-    difficulty: Difficulty.HARD,
-    tags: ['trail', 'hills', 'destination'],
-    createdAt: Date.now(),
-    rating: 4.9
+    id: 'u_3',
+    username: 'MokaPotMaster',
+    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop',
+    bio: 'Vertical gains and dark roasts.',
+    joinedClubIds: ['c1'],
+    friendIds: [],
+    isSetup: true,
+    stats: { totalDistance: 89, totalRuns: 15, avgPace: '6:05' }
   },
   {
-    id: 'r3',
-    name: 'Latte Art Parkway',
-    description: 'Smooth asphalt through the park, passing three specialty cafes.',
-    creatorId: 'user_1',
-    creatorName: 'BaristaRun',
-    path: [{ lat: 37.7649, lng: -122.4494 }, { lat: 37.7549, lng: -122.4594 }],
-    distance: 4.0,
-    elevationGain: 35,
-    difficulty: Difficulty.MODERATE,
-    tags: ['park', 'urban', 'coffee'],
-    createdAt: Date.now(),
-    rating: 4.6
-  }
-];
-
-const INITIAL_CLUBS: RunClub[] = [
-  {
-    id: 'c1',
-    name: 'The Espresso Express',
-    description: 'High-speed morning sessions followed by immediate caffeine intake.',
-    logo: 'https://images.unsplash.com/photo-1511920170033-f8396924c348?w=200&h=200&fit=crop',
-    memberCount: 124,
-    weeklyRouteId: 'r1',
-    meetingTime: 'Tuesdays @ 6:30 AM',
-    location: 'Pier 39, Harbor View',
-    creatorId: 'system'
+    id: 'u_4',
+    username: 'LatteLady',
+    avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=200&h=200&fit=crop',
+    bio: 'Slow runs, high-quality beans.',
+    joinedClubIds: [],
+    friendIds: [],
+    isSetup: true,
+    stats: { totalDistance: 210, totalRuns: 42, avgPace: '5:45' }
   }
 ];
 
 export const storageService = {
   getRoutes: (): Route[] => {
     const data = localStorage.getItem(KEYS.ROUTES);
-    return data ? JSON.parse(data) : INITIAL_ROUTES;
+    return data ? JSON.parse(data) : [];
   },
   saveRoute: (route: Route) => {
     const routes = storageService.getRoutes();
@@ -105,7 +81,6 @@ export const storageService = {
     const updated = [run, ...runs];
     localStorage.setItem(KEYS.RUNS, JSON.stringify(updated));
     
-    // Update profile stats
     const profile = storageService.getProfile();
     profile.stats.totalDistance += run.distance;
     profile.stats.totalRuns += 1;
@@ -120,6 +95,7 @@ export const storageService = {
     const data = localStorage.getItem(KEYS.PROFILE);
     const stored = data ? JSON.parse(data) : INITIAL_PROFILE;
     if (!stored.joinedClubIds) stored.joinedClubIds = [];
+    if (!stored.friendIds) stored.friendIds = INITIAL_PROFILE.friendIds;
     if (!stored.theme) stored.theme = 'barista';
     if (stored.isSetup === undefined) stored.isSetup = false;
     return stored;
@@ -127,9 +103,24 @@ export const storageService = {
   saveProfile: (profile: UserProfile) => {
     localStorage.setItem(KEYS.PROFILE, JSON.stringify(profile));
   },
+  getAllUsers: (): UserProfile[] => {
+    const data = localStorage.getItem(KEYS.USERS);
+    return data ? JSON.parse(data) : DISCOVERY_USERS;
+  },
+  toggleFollowUser: (targetUserId: string) => {
+    const profile = storageService.getProfile();
+    const index = profile.friendIds.indexOf(targetUserId);
+    if (index > -1) {
+      profile.friendIds.splice(index, 1);
+    } else {
+      profile.friendIds.push(targetUserId);
+    }
+    storageService.saveProfile(profile);
+    return profile;
+  },
   getClubs: (): RunClub[] => {
     const data = localStorage.getItem(KEYS.CLUBS);
-    return data ? JSON.parse(data) : INITIAL_CLUBS;
+    return data ? JSON.parse(data) : [];
   },
   saveClub: (club: RunClub) => {
     const clubs = storageService.getClubs();
@@ -156,7 +147,6 @@ export const storageService = {
     const updated = [review, ...reviews];
     localStorage.setItem(KEYS.REVIEWS, JSON.stringify(updated));
 
-    // Link review to most recent run of this route for this user
     const runs = storageService.getRuns();
     const targetRun = runs.find(r => r.routeId === review.routeId && !r.reviewId);
     if (targetRun) {
@@ -164,13 +154,11 @@ export const storageService = {
       storageService.updateRun(targetRun);
     }
 
-    // Update the route's average rating
-    const routeReviews = updated.filter(r => r.routeId === review.routeId);
-    const avgRating = routeReviews.reduce((acc, r) => acc + r.rating, 0) / routeReviews.length;
-    
     const routes = storageService.getRoutes();
     const targetRoute = routes.find(r => r.id === review.routeId);
     if (targetRoute) {
+      const routeReviews = updated.filter(r => r.routeId === review.routeId);
+      const avgRating = routeReviews.reduce((acc, r) => acc + r.rating, 0) / routeReviews.length;
       targetRoute.rating = parseFloat(avgRating.toFixed(1));
       storageService.updateRoute(targetRoute);
     }

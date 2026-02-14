@@ -8,6 +8,7 @@ import RouteCreator from './components/RouteCreator';
 import ClubCreator from './components/ClubCreator';
 import ReviewModal from './components/ReviewModal';
 import Onboarding from './components/Onboarding';
+import FriendsList from './components/FriendsList';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<AppTab>('explore');
@@ -51,7 +52,6 @@ const App: React.FC = () => {
     setActiveTab('runs');
     setProfile(storageService.getProfile());
     
-    // Trigger review modal after a short delay
     if (route) {
       setTimeout(() => setPendingReviewRoute(route), 1000);
     }
@@ -239,6 +239,10 @@ const App: React.FC = () => {
           </div>
         )}
 
+        {activeTab === 'friends' && profile && (
+          <FriendsList currentUser={profile} onUpdate={setProfile} />
+        )}
+
         {activeTab === 'clubs' && (
           <div className="space-y-10 fade-slide-up">
             <div className="flex justify-between items-end">
@@ -256,7 +260,6 @@ const App: React.FC = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               {clubs.map(club => {
-                const weeklyRoute = routes.find(r => r.id === club.weeklyRouteId);
                 const isJoined = profile?.joinedClubIds.includes(club.id);
                 return (
                   <div key={club.id} className="bg-[var(--card-bg)] rounded-[3rem] border border-[var(--border-color)] overflow-hidden transition-all duration-500 card-shadow group">
@@ -293,7 +296,7 @@ const App: React.FC = () => {
           <div className="space-y-10 fade-slide-up">
             <div className="flex justify-between items-center">
               <h2 className="text-4xl font-display font-bold text-[var(--text-main)]">PAST BREWS</h2>
-              <div className="bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] px-5 py-2 rounded-full border border-[var(--accent-primary)]/20 text-[10px] font-black uppercase tracking-[0.2em]">
+              <div className="bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] px-5 py-2 rounded-full border border-[var(--border-color)] text-[10px] font-black uppercase tracking-[0.2em]">
                 {runs.length} SESSIONS
               </div>
             </div>

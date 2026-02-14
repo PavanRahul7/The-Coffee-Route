@@ -68,6 +68,7 @@ export interface UserProfile {
   bio: string;
   theme?: ThemeType;
   joinedClubIds: string[];
+  friendIds: string[];
   isSetup: boolean;
   stats: {
     totalDistance: number;
@@ -76,4 +77,4 @@ export interface UserProfile {
   };
 }
 
-export type AppTab = 'explore' | 'clubs' | 'create' | 'runs' | 'profile';
+export type AppTab = 'explore' | 'clubs' | 'friends' | 'create' | 'runs' | 'profile';
