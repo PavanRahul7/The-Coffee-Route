@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { AppTab, Route, RunHistory, UserProfile, Difficulty, ThemeType, RunClub, Review, UnitSystem } from './types';
 import { storageService } from './services/storageService';
@@ -42,7 +41,8 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    setRoutes(storageService.getRoutes());
+    const loadedRoutes = storageService.getRoutes();
+    setRoutes(loadedRoutes);
     setClubs(storageService.getClubs());
     setRuns(storageService.getRuns());
     const p = storageService.getProfile();
@@ -51,6 +51,18 @@ const App: React.FC = () => {
     if (p.unitSystem) setUnitSystem(p.unitSystem);
 
     checkOfflineRoutes();
+
+    // Deep Linking Support
+    const urlParams = new URLSearchParams(window.location.search);
+    const routeId = urlParams.get('routeId');
+    if (routeId) {
+      const route = loadedRoutes.find(r => r.id === routeId);
+      if (route) {
+        setSelectedRoute(route);
+        // Clear param without refreshing
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    }
   }, []);
 
   const checkOfflineRoutes = async () => {

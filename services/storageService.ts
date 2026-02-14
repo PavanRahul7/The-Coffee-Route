@@ -1,3 +1,4 @@
+
 import { Route, RunHistory, UserProfile, Difficulty, RunClub, Review } from '../types';
 
 const KEYS = {
@@ -12,7 +13,7 @@ const KEYS = {
 const INITIAL_PROFILE: UserProfile = {
   id: 'user_1',
   username: 'New Roaster',
-  avatar: 'https://img.freepik.com/free-vector/cute-coffee-cup-running-cartoon-vector-icon-illustration-food-drink-icon-concept-isolated-flat_138676-4318.jpg?w=740',
+  avatar: 'https://images.unsplash.com/photo-1476480862126-209bfaa8edc8?w=400&h=400&fit=crop',
   bio: 'Just starting my journey. Every run deserves a destination.',
   joinedClubIds: [],
   friendIds: ['u_2', 'u_3'],
@@ -28,9 +29,9 @@ const INITIAL_PROFILE: UserProfile = {
 const DISCOVERY_USERS: UserProfile[] = [
   {
     id: 'u_2',
-    username: 'EspressoEnthusiast',
-    avatar: 'https://img.freepik.com/free-vector/hand-drawn-retro-cartoon-coffee-character_23-2150682896.jpg?w=740',
-    bio: 'Pacing for the perfect crema.',
+    username: 'TrailBlazer',
+    avatar: 'https://images.unsplash.com/photo-1530541930197-ff16ac917b0e?w=400&h=400&fit=crop',
+    bio: 'Pacing for the long haul.',
     joinedClubIds: ['c1'],
     friendIds: [],
     isSetup: true,
@@ -39,9 +40,9 @@ const DISCOVERY_USERS: UserProfile[] = [
   },
   {
     id: 'u_3',
-    username: 'MokaPotMaster',
-    avatar: 'https://img.freepik.com/free-vector/hand-drawn-retro-cartoon-coffee-bean-illustration_23-2150682898.jpg?w=740',
-    bio: 'Vertical gains and dark roasts.',
+    username: 'CityStrider',
+    avatar: 'https://images.unsplash.com/photo-1532444458054-015fddf2b2ca?w=400&h=400&fit=crop',
+    bio: 'Vertical gains and early mornings.',
     joinedClubIds: ['c1'],
     friendIds: [],
     isSetup: true,
@@ -50,9 +51,9 @@ const DISCOVERY_USERS: UserProfile[] = [
   },
   {
     id: 'u_4',
-    username: 'LatteLady',
-    avatar: 'https://img.freepik.com/free-vector/hand-drawn-retro-cartoon-cup-coffee-illustration_23-2150682894.jpg?w=740',
-    bio: 'Slow runs, high-quality beans.',
+    username: 'TempoRunner',
+    avatar: 'https://images.unsplash.com/photo-1452626038306-9aae5e071dd3?w=400&h=400&fit=crop',
+    bio: 'Consistency is my only goal.',
     joinedClubIds: [],
     friendIds: [],
     isSetup: true,
@@ -167,6 +168,7 @@ export const storageService = {
       const routeReviews = updated.filter(r => r.routeId === review.routeId);
       const avgRating = routeReviews.reduce((acc, r) => acc + r.rating, 0) / routeReviews.length;
       targetRoute.rating = parseFloat(avgRating.toFixed(1));
+      targetRoute.rating = isNaN(targetRoute.rating) ? 0 : targetRoute.rating;
       storageService.updateRoute(targetRoute);
     }
   }

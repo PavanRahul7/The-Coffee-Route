@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import { Route, Difficulty, Review, UnitSystem } from '../types';
 import { AreaChart, Area, ResponsiveContainer, Tooltip } from 'recharts';
@@ -23,6 +22,7 @@ const RouteDetail: React.FC<RouteDetailProps> = ({ route, unitSystem, onClose, o
   const [reviews, setReviews] = useState<Review[]>([]);
   const [isDownloaded, setIsDownloaded] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
+  const [shareToast, setShareToast] = useState(false);
 
   useEffect(() => {
     const allReviews = storageService.getReviews();
@@ -45,6 +45,31 @@ const RouteDetail: React.FC<RouteDetailProps> = ({ route, unitSystem, onClose, o
       console.error("Download failed", e);
     } finally {
       setDownloadProgress(null);
+    }
+  };
+
+  const handleShare = async () => {
+    const shareUrl = `${window.location.origin}${window.location.pathname}?routeId=${route.id}`;
+    
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `Run ${route.name} on The Coffee Route`,
+          text: `Check out this ${route.distance}km route! ${route.description}`,
+          url: shareUrl,
+        });
+      } catch (err) {
+        console.error("Error sharing", err);
+      }
+    } else {
+      // Fallback: Copy to clipboard
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        setShareToast(true);
+        setTimeout(() => setShareToast(false), 3000);
+      } catch (err) {
+        console.error("Failed to copy", err);
+      }
     }
   };
 
@@ -132,6 +157,13 @@ const RouteDetail: React.FC<RouteDetailProps> = ({ route, unitSystem, onClose, o
 
   return (
     <div className="fixed inset-0 z-[100] bg-[var(--bg-color)] flex flex-col md:max-w-2xl md:mx-auto animate-in slide-in-from-right duration-500 overflow-hidden">
+      {/* Toast for Copy Feedback */}
+      {shareToast && (
+        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[200] bg-emerald-500 text-white px-8 py-4 rounded-3xl font-bold uppercase tracking-widest text-[10px] shadow-2xl animate-in fade-in slide-in-from-top-4">
+          Route Link Copied to Clipboard
+        </div>
+      )}
+
       <div className="relative h-[45vh] shrink-0">
         <div ref={mapRef} className="w-full h-full" />
         <div className="absolute inset-0 bg-gradient-to-t from-[var(--bg-color)] via-transparent to-black/30 pointer-events-none" />
@@ -145,29 +177,40 @@ const RouteDetail: React.FC<RouteDetailProps> = ({ route, unitSystem, onClose, o
           </svg>
         </button>
 
-        <button 
-          onClick={handleDownload}
-          disabled={isDownloaded || downloadProgress !== null}
-          className={`absolute top-8 right-8 glass p-4 rounded-2xl z-20 transition-all active:scale-95 ${isDownloaded ? 'text-emerald-400' : 'text-white'}`}
-        >
-          {downloadProgress !== null ? (
-            <div className="relative w-6 h-6 flex items-center justify-center">
-              <svg className="animate-spin h-6 w-6 text-[var(--accent-primary)]" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-              <span className="absolute text-[8px] font-black">{downloadProgress}%</span>
-            </div>
-          ) : isDownloaded ? (
-            <svg className="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
-               <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-            </svg>
-          ) : (
+        <div className="absolute top-8 right-8 flex gap-3 z-20">
+          <button 
+            onClick={handleShare}
+            className="glass p-4 rounded-2xl text-white transition-all active:scale-95 hover:bg-white/10"
+          >
             <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
             </svg>
-          )}
-        </button>
+          </button>
+
+          <button 
+            onClick={handleDownload}
+            disabled={isDownloaded || downloadProgress !== null}
+            className={`glass p-4 rounded-2xl transition-all active:scale-95 ${isDownloaded ? 'text-emerald-400' : 'text-white'}`}
+          >
+            {downloadProgress !== null ? (
+              <div className="relative w-6 h-6 flex items-center justify-center">
+                <svg className="animate-spin h-6 w-6 text-[var(--accent-primary)]" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span className="absolute text-[8px] font-black">{downloadProgress}%</span>
+              </div>
+            ) : isDownloaded ? (
+              <svg className="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
+                 <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+              </svg>
+            ) : (
+              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+            )}
+          </button>
+        </div>
 
         {!mapReady && (
           <div className="absolute inset-0 flex items-center justify-center bg-[var(--bg-color)]/20 backdrop-blur-sm z-[10]">
@@ -227,7 +270,7 @@ const RouteDetail: React.FC<RouteDetailProps> = ({ route, unitSystem, onClose, o
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={elevationData}>
                 <defs>
-                  <linearGradient id="colorElev" x1="0" y1="0" x2="0" y2="1">
+                  <linearGradient id="colorElev" x1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="var(--accent-secondary)" stopOpacity={0.4}/>
                     <stop offset="95%" stopColor="var(--accent-secondary)" stopOpacity={0}/>
                   </linearGradient>
