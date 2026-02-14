@@ -24,6 +24,7 @@ const LiveTracking: React.FC<LiveTrackingProps> = ({ route, unitSystem, onFinish
   const [isOffRoute, setIsOffRoute] = useState(false);
   const [mapReady, setMapReady] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(3);
+  const [shareToast, setShareToast] = useState(false);
   
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<any>(null);
@@ -180,6 +181,27 @@ const LiveTracking: React.FC<LiveTrackingProps> = ({ route, unitSystem, onFinish
     setIsOffRoute(off);
   };
 
+  const handleShareLive = async () => {
+    const shareUrl = `${window.location.origin}${window.location.pathname}?routeId=${route.id}&live=true`;
+    const message = `I'm currently running "${route.name}"! Track my route on The Coffee Route: ${shareUrl}`;
+    
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `Live Tracking: ${route.name}`,
+          text: message,
+          url: shareUrl,
+        });
+      } catch (err) { console.error("Error sharing", err); }
+    } else {
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        setShareToast(true);
+        setTimeout(() => setShareToast(false), 3000);
+      } catch (err) { console.error("Failed to copy", err); }
+    }
+  };
+
   const formatTime = (seconds: number) => {
     const hrs = Math.floor(seconds / 3600);
     const mins = Math.floor((seconds % 3600) / 60);
@@ -237,9 +259,26 @@ const LiveTracking: React.FC<LiveTrackingProps> = ({ route, unitSystem, onFinish
         </div>
       )}
 
+      {shareToast && (
+        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[3001] bg-emerald-500 text-white px-8 py-4 rounded-3xl font-bold uppercase tracking-widest text-[10px] shadow-2xl">
+          Live Link Copied
+        </div>
+      )}
+
       <div className="flex-1 bg-slate-900 relative">
         <div ref={mapRef} className="w-full h-full" />
         <div className="absolute inset-0 bg-gradient-to-b from-[var(--bg-color)]/60 via-transparent to-[var(--bg-color)]/80 pointer-events-none" />
+
+        {/* Floating Share Button */}
+        <button 
+          onClick={handleShareLive}
+          className="absolute top-16 right-8 z-[1006] glass p-5 rounded-3xl text-white shadow-2xl active:scale-90 transition-all border border-white/10 group"
+        >
+          <svg className="h-6 w-6 group-hover:text-[var(--accent-primary)] transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+          </svg>
+          <span className="absolute top-full mt-2 right-0 bg-[var(--card-bg)] px-3 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Share Live</span>
+        </button>
 
         {isOffRoute && (
           <div className="absolute top-16 left-8 right-8 z-[1005]">

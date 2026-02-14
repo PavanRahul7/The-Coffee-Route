@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { UserProfile } from '../types';
 import { storageService } from '../services/storageService';
@@ -18,7 +19,10 @@ const FriendsList: React.FC<FriendsListProps> = ({ currentUser, onUpdate }) => {
 
   const handleToggleFollow = (id: string) => {
     const updated = storageService.toggleFollowUser(id);
-    onUpdate(updated);
+    if (updated) {
+      onUpdate(updated);
+      setAllUsers(storageService.getAllUsers());
+    }
   };
 
   const filteredUsers = allUsers.filter(u => 
@@ -28,10 +32,16 @@ const FriendsList: React.FC<FriendsListProps> = ({ currentUser, onUpdate }) => {
   );
 
   const friends = allUsers.filter(u => currentUser.friendIds.includes(u.id));
+  const discovery = filteredUsers.filter(u => !currentUser.friendIds.includes(u.id));
   const unitSystem = currentUser.unitSystem || 'metric';
 
   return (
     <div className="space-y-12 pb-20 fade-slide-up">
+      <header className="space-y-2">
+        <h2 className="text-4xl font-display font-bold">THE CREW</h2>
+        <p className="text-xs opacity-40 font-bold uppercase tracking-[0.3em]">Build your social roast circle</p>
+      </header>
+
       <div className="relative group">
         <input 
           type="text"
@@ -45,70 +55,59 @@ const FriendsList: React.FC<FriendsListProps> = ({ currentUser, onUpdate }) => {
         </svg>
       </div>
 
-      {friends.length > 0 && !searchTerm && (
+      {friends.length > 0 && (
         <section className="space-y-6">
           <div className="flex justify-between items-end px-1">
-            <h2 className="text-xs font-black uppercase tracking-[0.4em] opacity-40 font-coffee">Your Crew</h2>
-            <span className="text-[10px] font-bold opacity-30 uppercase tracking-widest">{friends.length} FOLLOWING</span>
+            <h2 className="text-[10px] font-black uppercase tracking-[0.4em] opacity-40 font-coffee">Following ({friends.length})</h2>
           </div>
           <div className="grid grid-cols-1 gap-4">
-            {friends.map(friend => {
-              const distInfo = formatDistance(friend.stats.totalDistance, unitSystem);
-              const paceInfo = formatPace(friend.stats.avgPace, unitSystem);
-              return (
-                <div key={friend.id} className="bg-[var(--card-bg)] rounded-[2.5rem] p-6 border border-[var(--border-color)] flex items-center gap-6 group hover:border-[var(--accent-primary)]/30 transition-all card-shadow">
-                  <img src={friend.avatar} className="w-16 h-16 rounded-2xl object-cover ring-2 ring-[var(--accent-primary)]/10" alt={friend.username} />
-                  <div className="flex-1">
-                    <h3 className="text-lg font-bold group-hover:text-[var(--accent-primary)] transition-colors">{friend.username}</h3>
-                    <p className="text-xs opacity-40 italic">"{friend.bio}"</p>
-                    <div className="flex gap-4 mt-2">
-                      <span className="text-[9px] font-black uppercase tracking-widest opacity-30">{distInfo.value} {distInfo.unit}</span>
-                      <span className="text-[9px] font-black uppercase tracking-widest opacity-30">{paceInfo} {getPaceUnit(unitSystem)}</span>
-                    </div>
+            {friends.map(friend => (
+              <div key={friend.id} className="bg-[var(--card-bg)] rounded-[2.5rem] p-6 border border-[var(--border-color)] flex items-center gap-6 card-shadow">
+                <img src={friend.avatar} className="w-16 h-16 rounded-2xl object-cover ring-2 ring-[var(--accent-primary)]/20" alt={friend.username} />
+                <div className="flex-1">
+                  <h3 className="text-lg font-bold">{friend.username}</h3>
+                  <div className="flex gap-3 text-[9px] font-black uppercase tracking-widest opacity-30 mt-1">
+                    <span>{formatDistance(friend.stats.totalDistance, unitSystem).value} {formatDistance(friend.stats.totalDistance, unitSystem).unit}</span>
+                    <span>•</span>
+                    <span>{formatPace(friend.stats.avgPace, unitSystem)} PACE</span>
                   </div>
-                  <button 
-                    onClick={() => handleToggleFollow(friend.id)}
-                    className="bg-red-500/10 text-red-500 text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-xl hover:bg-red-500 hover:text-white transition-all"
-                  >
-                    Unfollow
-                  </button>
                 </div>
-              );
-            })}
+                <button 
+                  onClick={() => handleToggleFollow(friend.id)}
+                  className="bg-red-500/10 text-red-500 text-[10px] font-black uppercase tracking-widest px-6 py-3 rounded-2xl hover:bg-red-500 hover:text-white transition-all"
+                >
+                  Unfollow
+                </button>
+              </div>
+            ))}
           </div>
         </section>
       )}
 
-      <section className="space-y-6">
-        <div className="flex justify-between items-end px-1">
-          <h2 className="text-xs font-black uppercase tracking-[0.4em] opacity-40 font-coffee">Discovery Roast</h2>
-          <span className="text-[10px] font-bold opacity-30 uppercase tracking-widest">Find new partners</span>
-        </div>
-        <div className="grid grid-cols-1 gap-4">
-          {filteredUsers.map(user => {
-            const isFollowing = currentUser.friendIds.includes(user.id);
-            return (
+      {discovery.length > 0 && (
+        <section className="space-y-6">
+          <div className="flex justify-between items-end px-1">
+            <h2 className="text-[10px] font-black uppercase tracking-[0.4em] opacity-40 font-coffee">Discover New Baristas</h2>
+          </div>
+          <div className="grid grid-cols-1 gap-4">
+            {discovery.map(user => (
               <div key={user.id} className="bg-[var(--card-bg)] rounded-[2.5rem] p-6 border border-[var(--border-color)] flex items-center gap-6 card-shadow">
-                <img src={user.avatar} className="w-16 h-16 rounded-2xl object-cover" alt={user.username} />
+                <img src={user.avatar} className="w-16 h-16 rounded-2xl object-cover grayscale-[0.5]" alt={user.username} />
                 <div className="flex-1">
                   <h3 className="text-lg font-bold">{user.username}</h3>
-                  <p className="text-xs opacity-40">{user.bio}</p>
+                  <p className="text-xs opacity-40 italic mt-0.5 line-clamp-1">"{user.bio}"</p>
                 </div>
                 <button 
                   onClick={() => handleToggleFollow(user.id)}
-                  className={`text-[10px] font-black uppercase tracking-widest px-6 py-3 rounded-2xl transition-all ${
-                    isFollowing 
-                      ? 'bg-slate-800 text-white/40' 
-                      : 'bg-[var(--accent-primary)] text-white shadow-lg shadow-[var(--accent-primary)]/20 active:scale-90'
-                  }`}
+                  className="bg-[var(--accent-primary)] text-[var(--bg-color)] text-[10px] font-black uppercase tracking-widest px-8 py-3 rounded-2xl shadow-lg shadow-[var(--accent-primary)]/20 active:scale-90 transition-all"
                 >
-                  {isFollowing ? 'Following' : 'Follow'}
+                  Follow
                 </button>
               </div>
-            );
-          })}
-        </div>
-      </section>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 };
