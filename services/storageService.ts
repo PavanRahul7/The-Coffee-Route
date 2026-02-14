@@ -10,10 +10,11 @@ const KEYS = {
 
 const INITIAL_PROFILE: UserProfile = {
   id: 'user_1',
-  username: 'CaffeineRunner',
+  username: 'New Roaster',
   avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&h=400&fit=crop',
-  bio: 'Running for the roast. Every run deserves a destination.',
-  joinedClubIds: ['c1'],
+  bio: 'Just starting my journey. Every run deserves a destination.',
+  joinedClubIds: [],
+  isSetup: false,
   stats: {
     totalDistance: 0,
     totalRuns: 0,
@@ -77,28 +78,6 @@ const INITIAL_CLUBS: RunClub[] = [
     meetingTime: 'Tuesdays @ 6:30 AM',
     location: 'Pier 39, Harbor View',
     creatorId: 'system'
-  },
-  {
-    id: 'c2',
-    name: 'Brew Crew Runners',
-    description: 'Community-focused club exploring hidden neighborhood coffee gems.',
-    logo: 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=200&h=200&fit=crop',
-    memberCount: 89,
-    weeklyRouteId: 'r3',
-    meetingTime: 'Saturdays @ 9:00 AM',
-    location: 'Central Park North',
-    creatorId: 'system'
-  },
-  {
-    id: 'c3',
-    name: 'Steep & Sprint',
-    description: 'Hill training experts who believe the best view is from the top of the hill with a cortado.',
-    logo: 'https://images.unsplash.com/photo-1447933630913-bb79912e47b4?w=200&h=200&fit=crop',
-    memberCount: 56,
-    weeklyRouteId: 'r2',
-    meetingTime: 'Thursdays @ 6:00 PM',
-    location: 'Mountain View Summit',
-    creatorId: 'system'
   }
 ];
 
@@ -132,11 +111,17 @@ export const storageService = {
     profile.stats.totalRuns += 1;
     storageService.saveProfile(profile);
   },
+  updateRun: (updatedRun: RunHistory) => {
+    const runs = storageService.getRuns();
+    const updated = runs.map(r => r.id === updatedRun.id ? updatedRun : r);
+    localStorage.setItem(KEYS.RUNS, JSON.stringify(updated));
+  },
   getProfile: (): UserProfile => {
     const data = localStorage.getItem(KEYS.PROFILE);
     const stored = data ? JSON.parse(data) : INITIAL_PROFILE;
     if (!stored.joinedClubIds) stored.joinedClubIds = [];
     if (!stored.theme) stored.theme = 'barista';
+    if (stored.isSetup === undefined) stored.isSetup = false;
     return stored;
   },
   saveProfile: (profile: UserProfile) => {
@@ -170,6 +155,14 @@ export const storageService = {
     const reviews = storageService.getReviews();
     const updated = [review, ...reviews];
     localStorage.setItem(KEYS.REVIEWS, JSON.stringify(updated));
+
+    // Link review to most recent run of this route for this user
+    const runs = storageService.getRuns();
+    const targetRun = runs.find(r => r.routeId === review.routeId && !r.reviewId);
+    if (targetRun) {
+      targetRun.reviewId = review.id;
+      storageService.updateRun(targetRun);
+    }
 
     // Update the route's average rating
     const routeReviews = updated.filter(r => r.routeId === review.routeId);

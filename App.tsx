@@ -7,6 +7,7 @@ import LiveTracking from './components/LiveTracking';
 import RouteCreator from './components/RouteCreator';
 import ClubCreator from './components/ClubCreator';
 import ReviewModal from './components/ReviewModal';
+import Onboarding from './components/Onboarding';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<AppTab>('explore');
@@ -18,6 +19,7 @@ const App: React.FC = () => {
   const [trackingRoute, setTrackingRoute] = useState<Route | null>(null);
   const [editingRoute, setEditingRoute] = useState<Route | null>(null);
   const [isAddingClub, setIsAddingClub] = useState(false);
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [pendingReviewRoute, setPendingReviewRoute] = useState<Route | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [theme, setTheme] = useState<ThemeType>('barista');
@@ -88,7 +90,7 @@ const App: React.FC = () => {
 
   const handleReviewSubmitted = (review: Review) => {
     setPendingReviewRoute(null);
-    // Refresh routes to show updated average rating
+    setRuns(storageService.getRuns());
     setRoutes(storageService.getRoutes());
   };
 
@@ -99,6 +101,11 @@ const App: React.FC = () => {
       setProfile(updatedProfile);
       storageService.saveProfile(updatedProfile);
     }
+  };
+
+  const handleManualReview = (run: RunHistory) => {
+    const route = routes.find(r => r.id === run.routeId);
+    if (route) setPendingReviewRoute(route);
   };
 
   const filteredRoutes = routes.filter(r => 
@@ -114,11 +121,15 @@ const App: React.FC = () => {
     { id: 'forest', label: 'Forest Trail', colors: ['#050a06', '#a3e635', '#fbbf24'] },
   ];
 
+  if (profile && !profile.isSetup) {
+    return <Onboarding onComplete={setProfile} />;
+  }
+
   return (
     <div className="h-screen w-full flex flex-col overflow-hidden transition-all duration-500">
       <header className="px-8 pt-12 pb-8 flex justify-between items-end z-40 bg-gradient-to-b from-[var(--bg-color)] to-transparent shrink-0">
         <div className="space-y-1">
-          <span className="text-[10px] font-bold tracking-[0.4em] uppercase opacity-30 ml-0.5">Every run deserves a destination</span>
+          <span className="text-[10px] font-bold tracking-[0.2em] uppercase opacity-40 ml-0.5">Running from our problems toward caffeine</span>
           <h1 className="text-4xl sm:text-5xl font-display font-bold leading-none tracking-tight text-[var(--accent-primary)]">
             COFFEE ROUTES<span className="text-[var(--text-main)] opacity-10">/</span>
           </h1>
@@ -146,7 +157,7 @@ const App: React.FC = () => {
               <input 
                 type="text"
                 placeholder="Find a coffee shop path..."
-                className="relative w-full bg-[var(--card-bg)] border border-[var(--border-color)] rounded-3xl py-6 pl-16 pr-6 text-[var(--text-main)] font-semibold text-lg focus:outline-none focus:ring-2 ring-[var(--accent-primary)]/30 transition-all placeholder:text-[var(--text-muted)]/40"
+                className="relative w-full glass bg-white/5 border border-[var(--border-color)] rounded-3xl py-6 pl-16 pr-6 text-[var(--text-main)] font-semibold text-lg focus:outline-none focus:ring-2 ring-[var(--accent-primary)]/30 transition-all placeholder:text-[var(--text-muted)]/40"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
               />
@@ -159,7 +170,7 @@ const App: React.FC = () => {
               <section className="space-y-6">
                 <div className="flex justify-between items-end px-1">
                   <h2 className="text-xs font-black uppercase tracking-[0.3em] opacity-40 font-coffee">Staff Picks</h2>
-                  <span className="text-[10px] font-bold opacity-30">ROASTED RECENTLY</span>
+                  <span className="text-[10px] font-bold opacity-30 uppercase tracking-widest">Roasted Recently</span>
                 </div>
                 <div className="flex gap-6 overflow-x-auto pb-6 -mx-8 px-8 snap-x">
                    {routes.slice(0, 3).map(route => (
@@ -183,10 +194,6 @@ const App: React.FC = () => {
             <section className="space-y-8">
               <div className="flex justify-between items-end px-1">
                 <h2 className="text-xs font-black uppercase tracking-[0.3em] opacity-40 font-coffee">Daily Brews</h2>
-                <div className="flex gap-3">
-                   <div className="w-2 h-2 rounded-full bg-[var(--accent-primary)]"></div>
-                   <div className="w-2 h-2 rounded-full bg-white/10"></div>
-                </div>
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -203,7 +210,6 @@ const App: React.FC = () => {
                         alt={route.name} 
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-[var(--bg-color)]/95 via-transparent to-transparent opacity-90" />
-                      
                       <div className="absolute top-6 left-6 flex flex-wrap gap-2">
                         <span className={`px-4 py-2 rounded-full text-[9px] font-black tracking-widest uppercase backdrop-blur-xl border ${
                           route.difficulty === Difficulty.HARD ? 'bg-red-500/20 border-red-500/30 text-red-400' : 
@@ -212,7 +218,6 @@ const App: React.FC = () => {
                           {route.difficulty}
                         </span>
                       </div>
-
                       <div className="absolute bottom-6 left-8 right-8 flex items-end justify-between">
                         <div className="space-y-1">
                           <h3 className="text-3xl font-bold text-white group-hover:text-[var(--accent-primary)] transition-colors tracking-tight">{route.name}</h3>
@@ -254,10 +259,7 @@ const App: React.FC = () => {
                 const weeklyRoute = routes.find(r => r.id === club.weeklyRouteId);
                 const isJoined = profile?.joinedClubIds.includes(club.id);
                 return (
-                  <div 
-                    key={club.id} 
-                    className="bg-[var(--card-bg)] rounded-[3rem] border border-[var(--border-color)] overflow-hidden transition-all duration-500 card-shadow group"
-                  >
+                  <div key={club.id} className="bg-[var(--card-bg)] rounded-[3rem] border border-[var(--border-color)] overflow-hidden transition-all duration-500 card-shadow group">
                     <div className="p-8 flex gap-6">
                       <img src={club.logo} className="w-24 h-24 rounded-3xl object-cover ring-2 ring-[var(--accent-primary)]/20 shadow-xl" alt={club.name} />
                       <div className="flex-1 space-y-2">
@@ -276,42 +278,10 @@ const App: React.FC = () => {
                         </div>
                         <div className="flex items-center gap-3">
                           <span className="text-[10px] font-black uppercase tracking-widest opacity-40">{club.memberCount + (isJoined && club.creatorId !== 'user_1' ? 1 : 0)} MEMBERS</span>
-                          <span className="w-1 h-1 rounded-full bg-white/10"></span>
-                          <span className="text-[10px] font-black uppercase tracking-widest text-[var(--accent-secondary)]">{club.location}</span>
                         </div>
                         <p className="text-sm opacity-60 leading-relaxed line-clamp-2">{club.description}</p>
                       </div>
                     </div>
-                    
-                    {weeklyRoute && (
-                      <div className="px-8 pb-8">
-                        <div className="bg-[var(--bg-color)]/50 rounded-[2.5rem] p-6 border border-white/5 space-y-4">
-                          <div className="flex justify-between items-center">
-                            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-[var(--accent-primary)]">This Week's Roast</span>
-                            <span className="text-[10px] font-black uppercase tracking-widest opacity-30">{club.meetingTime}</span>
-                          </div>
-                          <div 
-                            onClick={() => setSelectedRoute(weeklyRoute)}
-                            className="flex items-center justify-between cursor-pointer group/route"
-                          >
-                            <div className="flex items-center gap-4">
-                              <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center group-hover/route:bg-[var(--accent-primary)] transition-colors">
-                                <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-                                </svg>
-                              </div>
-                              <div className="space-y-0.5">
-                                <div className="text-lg font-bold group-hover/route:text-[var(--accent-primary)] transition-colors">{weeklyRoute.name}</div>
-                                <div className="text-[10px] font-black uppercase tracking-widest opacity-30">{weeklyRoute.distance} KM • {weeklyRoute.difficulty}</div>
-                              </div>
-                            </div>
-                            <svg className="w-6 h-6 opacity-20 group-hover/route:opacity-100 group-hover/route:translate-x-1 transition-all" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 5l7 7-7 7" />
-                            </svg>
-                          </div>
-                        </div>
-                      </div>
-                    )}
                   </div>
                 );
               })}
@@ -335,36 +305,31 @@ const App: React.FC = () => {
                     <div className="space-y-1">
                       <span className="text-[10px] font-black uppercase tracking-[0.3em] text-[var(--accent-primary)]">Roast Summary</span>
                       <h4 className="text-3xl font-bold text-[var(--text-main)] tracking-tight leading-none">{run.routeName}</h4>
-                      <div className="text-xs font-medium opacity-40 uppercase tracking-widest pt-1">{new Date(run.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</div>
+                      <div className="text-xs font-medium opacity-40 uppercase tracking-widest pt-1">{new Date(run.date).toLocaleDateString()}</div>
                     </div>
-                    <div className="text-right">
+                    <div className="text-right flex flex-col items-end gap-2">
                       <div className="text-5xl font-display text-[var(--text-main)] leading-none">{run.distance.toFixed(2)}</div>
-                      <span className="text-[10px] font-black uppercase tracking-widest opacity-30">KILOMETERS</span>
+                      {!run.reviewId && (
+                        <button 
+                          onClick={() => handleManualReview(run)}
+                          className="text-[9px] font-black uppercase tracking-widest bg-amber-400 text-black px-3 py-1 rounded-full animate-pulse"
+                        >
+                          LEAVE REVIEW
+                        </button>
+                      )}
                     </div>
                   </div>
                   
                   <div className="grid grid-cols-2 gap-4 mb-8">
-                    <div className="bg-[var(--bg-color)]/60 p-6 rounded-[2rem] border border-white/5 shadow-inner flex flex-col items-center">
+                    <div className="bg-[var(--bg-color)]/60 p-6 rounded-[2rem] border border-white/5 flex flex-col items-center">
                       <span className="text-[9px] uppercase font-black tracking-[0.2em] opacity-30 mb-2">Duration</span>
                       <span className="text-2xl font-display">{Math.floor(run.duration / 60)}:{(run.duration % 60).toString().padStart(2, '0')}</span>
                     </div>
-                    <div className="bg-[var(--bg-color)]/60 p-6 rounded-[2rem] border border-white/5 shadow-inner flex flex-col items-center">
+                    <div className="bg-[var(--bg-color)]/60 p-6 rounded-[2rem] border border-white/5 flex flex-col items-center">
                       <span className="text-[9px] uppercase font-black tracking-[0.2em] opacity-30 mb-2">Pace</span>
                       <span className="text-2xl font-display text-[var(--accent-secondary)]">{run.averagePace}</span>
                     </div>
                   </div>
-
-                  {run.coachingTips && (
-                    <div className="glass bg-[var(--accent-primary)]/5 border-l-4 border-[var(--accent-primary)] p-6 rounded-r-3xl relative overflow-hidden">
-                      <div className="absolute top-0 right-0 p-4 opacity-5">
-                         <svg className="w-16 h-16" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
-                      </div>
-                      <div className="flex items-center gap-3 mb-4">
-                         <span className="text-[10px] font-black uppercase tracking-[0.3em] text-[var(--accent-primary)]">Barista Insights</span>
-                      </div>
-                      <p className="text-sm italic font-medium leading-relaxed opacity-80">{run.coachingTips}</p>
-                    </div>
-                  )}
                 </div>
               ))}
             </div>
@@ -379,14 +344,17 @@ const App: React.FC = () => {
                 <div className="w-48 h-48 rounded-[4rem] p-1.5 border-2 border-[var(--border-color)] overflow-hidden shadow-2xl mx-auto rotate-3">
                    <img src={profile.avatar} className="w-full h-full rounded-[3.8rem] object-cover -rotate-3 hover:rotate-0 transition-transform duration-500" alt="Avatar" />
                 </div>
-                <button className="absolute -bottom-2 -right-2 bg-[var(--accent-primary)] p-5 rounded-3xl text-[var(--bg-color)] shadow-2xl hover:scale-110 active:scale-90 transition-all card-shadow">
+                <button 
+                  onClick={() => setIsEditingProfile(true)}
+                  className="absolute -bottom-2 -right-2 bg-[var(--accent-primary)] p-5 rounded-3xl text-[var(--bg-color)] shadow-2xl hover:scale-110 active:scale-90 transition-all card-shadow"
+                >
                   <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                   </svg>
                 </button>
               </div>
-              <h2 className="text-5xl font-extrabold mt-10 tracking-tight leading-none">{profile.username}</h2>
-              <p className="text-sm mt-4 font-semibold opacity-40 px-12 leading-relaxed">{profile.bio}</p>
+              <h2 className="text-5xl font-extrabold mt-10 tracking-tight leading-none uppercase">{profile.username}</h2>
+              <p className="text-sm mt-4 font-semibold opacity-40 px-12 leading-relaxed italic">"{profile.bio}"</p>
             </div>
 
             <div className="grid grid-cols-3 gap-6">
@@ -396,46 +364,16 @@ const App: React.FC = () => {
               </div>
               <div className="bg-[var(--card-bg)] p-8 rounded-[3rem] text-center border border-[var(--border-color)] card-shadow">
                 <div className="text-4xl font-display mb-1 text-[var(--accent-secondary)]">{profile.stats.totalRuns}</div>
-                <div className="text-[9px] font-black uppercase tracking-[0.3em] opacity-30">CUPS RUN</div>
+                <div className="text-[9px] font-black uppercase tracking-[0.3em] opacity-30">SESSIONS</div>
               </div>
               <div className="bg-[var(--card-bg)] p-8 rounded-[3rem] text-center border border-[var(--border-color)] card-shadow">
-                <div className="text-4xl font-display mb-1 text-orange-500">4:52</div>
-                <div className="text-[9px] font-black uppercase tracking-[0.3em] opacity-30">TOP PACE</div>
+                <div className="text-4xl font-display mb-1 text-orange-500">{profile.stats.avgPace}</div>
+                <div className="text-[9px] font-black uppercase tracking-[0.3em] opacity-30">AVG PACE</div>
               </div>
             </div>
 
-            {profile.joinedClubIds.length > 0 && (
-              <section className="space-y-6">
-                <h3 className="text-xs font-black uppercase tracking-[0.4em] opacity-30">Your Circles</h3>
-                <div className="space-y-4">
-                  {profile.joinedClubIds.map(id => {
-                    const club = clubs.find(c => c.id === id);
-                    if (!club) return null;
-                    return (
-                      <div key={id} className="flex items-center gap-4 bg-[var(--card-bg)] p-4 rounded-3xl border border-[var(--border-color)]">
-                        <img src={club.logo} className="w-12 h-12 rounded-xl object-cover" alt={club.name} />
-                        <div className="flex-1">
-                          <div className="font-bold text-sm">{club.name}</div>
-                          <div className="text-[9px] font-black uppercase tracking-widest opacity-30">{club.meetingTime}</div>
-                        </div>
-                        <button 
-                          onClick={(e) => toggleJoinClub(e, club.id)}
-                          className="text-[9px] font-black uppercase tracking-widest text-red-500/50 hover:text-red-500 px-3 py-1.5"
-                        >
-                          LEAVE
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              </section>
-            )}
-
             <section className="space-y-8">
-              <div className="px-1 space-y-1">
-                <h3 className="text-xs font-black uppercase tracking-[0.4em] opacity-30">Roast Profile</h3>
-                <p className="text-[10px] font-bold opacity-20">Tailor the high-performance interface.</p>
-              </div>
+              <h3 className="text-xs font-black uppercase tracking-[0.4em] opacity-30 text-center">Interface Profile</h3>
               <div className="grid grid-cols-2 gap-6">
                 {themeOptions.map(opt => (
                   <button
@@ -448,14 +386,7 @@ const App: React.FC = () => {
                         <div key={i} className="w-5 h-5 rounded-full shadow-inner border border-white/10" style={{ backgroundColor: c }}></div>
                       ))}
                     </div>
-                    <span className="text-sm font-black uppercase tracking-widest" style={{ color: theme === opt.id ? 'var(--accent-primary)' : 'var(--text-main)' }}>{opt.label}</span>
-                    {theme === opt.id && (
-                      <div className="absolute top-6 right-6 text-[var(--accent-primary)]">
-                        <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                        </svg>
-                      </div>
-                    )}
+                    <span className="text-sm font-black uppercase tracking-widest">{opt.label}</span>
                   </button>
                 ))}
               </div>
@@ -463,18 +394,6 @@ const App: React.FC = () => {
           </div>
         )}
       </main>
-
-      {activeTab === 'explore' && !editingRoute && (
-        <button 
-          onClick={() => setActiveTab('create')}
-          className="fixed right-10 bottom-36 w-20 h-20 rounded-[2rem] shadow-2xl z-40 btn-active flex items-center justify-center rotate-6 hover:rotate-12 transition-all group overflow-hidden bg-[var(--accent-primary)]"
-        >
-          <div className="absolute inset-0 bg-white/30 opacity-0 group-hover:opacity-100 transition-opacity" />
-          <svg className="h-10 w-10 text-[var(--bg-color)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M12 4v16m8-8H4" />
-          </svg>
-        </button>
-      )}
 
       <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />
 
@@ -491,11 +410,7 @@ const App: React.FC = () => {
       )}
 
       {trackingRoute && (
-        <LiveTracking 
-          route={trackingRoute} 
-          onFinish={handleFinishRun}
-          onCancel={() => setTrackingRoute(null)}
-        />
+        <LiveTracking route={trackingRoute} onFinish={handleFinishRun} onCancel={() => setTrackingRoute(null)} />
       )}
 
       {(activeTab === 'create' || editingRoute) && (
@@ -515,6 +430,13 @@ const App: React.FC = () => {
           onSave={handleSaveClub}
           onCancel={() => setIsAddingClub(false)}
         />
+      )}
+
+      {isEditingProfile && (
+        <Onboarding onComplete={(p) => {
+          setProfile(p);
+          setIsEditingProfile(false);
+        }} />
       )}
 
       {pendingReviewRoute && profile && (

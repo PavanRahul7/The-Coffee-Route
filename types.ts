@@ -68,6 +68,7 @@ export interface UserProfile {
   bio: string;
   theme?: ThemeType;
   joinedClubIds: string[];
+  isSetup: boolean;
   stats: {
     totalDistance: number;
     totalRuns: number;
