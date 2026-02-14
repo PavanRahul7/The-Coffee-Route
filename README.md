@@ -1,55 +1,42 @@
-# 🏃 RouteUp
+# ☕ Coffee Routes
 
-**Map it. Share it. Run it.**
+**Every run deserves a destination.**
 
-RouteUp is a social running app where runners can create routes, share them with the community, and track their runs in real time. Whether you're exploring new paths or chasing a friend's personal best — RouteUp keeps you moving.
+Coffee Routes is a social running app built for those who chase both personal bests and perfect roasts. Create routes, share hidden gem cafes with the community, and track your performance in real time. 
 
 ---
 
 ## Features
 
-**🗺️ Route Creation** — Draw running routes on an interactive map with auto-distance calculation, elevation data, and difficulty ratings.
+**🗺️ Destination Mapping** — Draw running routes that end at your favorite cafes with auto-distance, elevation data, and coffee-rating integration.
 
-**🌍 Discover Routes** — Browse a community feed of shared routes. Filter by distance, difficulty, location, or tags like *trail*, *urban*, and *scenic*.
+**🌍 Discover Roasts** — Browse a community feed of coffee-themed runs. Filter by distance, roast difficulty, and barista-approved tags.
 
-**📍 Live Tracking** — Select any route, hit Start, and track your position in real time. See your pace, distance covered, and progress along the route as you run.
+**📍 Live Barista Tracking** — Select any route, hit Start, and track your progress toward your next caffeine hit in real time.
 
-**⚠️ Off-Route Alerts** — Deviate more than 50m from the planned path? RouteUp lets you know so you can find your way back.
+**⚠️ Cold Brew Warning** — Deviate more than 50m from your path? Coffee Routes alerts you to get back on track before the cafe closes.
 
-**📊 Run Summary** — Finish a run and get a full breakdown: total time, average pace, distance, and a map overlay comparing your actual path to the planned route.
+**📊 Post-Run Roast** — Get a full breakdown of your performance with AI coaching tips that use a rich, full-bodied performance metaphor.
 
-**👤 Profile & History** — Track your created routes and completed runs all in one place.
+**👤 Roaster Profile** — Keep track of your cups-run and kilometers-brewed.
 
 ---
 
 ## Tech Stack
 
-- **Google Maps JavaScript API** — Map rendering, route drawing, and geolocation
-- **Gemini API** — AI-powered route descriptions, similar route suggestions, and coaching tips
-- **Browser Geolocation API** — Real-time GPS tracking during runs
-- **LocalStorage / IndexedDB** — Client-side data persistence
+- **Leaflet & OpenStreetMap** — Custom map rendering and route drawing.
+- **Gemini AI** — Generates rich route descriptions and barista-themed motivational coaching.
+- **Browser Geolocation API** — Real-time performance tracking.
+- **LocalStorage** — Instant persistence for your routes and runs.
 
 ---
 
 ## Getting Started
 
-1. Open the app in your browser
-2. Create your first route or explore community routes
-3. Tap **Start Run** on any route to begin live tracking
-4. Share your routes and check your run history in your profile
+1. Open the app and select your roast (theme).
+2. Browse "Daily Brews" or draw your own "Barista Special" route.
+3. Tap **Start Session** and earn that espresso!
 
 ---
 
-## Screenshots
-
-*Coming soon*
-
----
-
-## License
-
-MIT
-
----
-
-Built with ❤️ for runners who love to explore.
+Built with ❤️ for runners who love the roast.

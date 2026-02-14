@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>ROUTE UP | High Performance Run Tracker</title>
+    <title>COFFEE ROUTES | Every run deserves a destination</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
-      @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Bebas+Neue&display=swap');
+      @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Bebas+Neue&family=Space+Grotesk:wght@300..700&display=swap');
       
       :root {
         --bg-color: #05070a;
@@ -56,6 +56,17 @@
         --glass-bg: rgba(10, 15, 11, 0.9);
       }
 
+      .theme-barista {
+        --bg-color: #1a0f0a;
+        --card-bg: rgba(44, 24, 16, 0.7);
+        --accent-primary: #d2b48c;
+        --accent-secondary: #fdf5e6;
+        --text-main: #fdf5e6;
+        --text-muted: #8b7355;
+        --border-color: rgba(210, 180, 140, 0.15);
+        --glass-bg: rgba(26, 15, 10, 0.92);
+      }
+
       html, body, #root {
         height: 100%;
         margin: 0;
@@ -74,6 +85,10 @@
       .font-display {
         font-family: 'Bebas Neue', cursive;
         letter-spacing: 0.05em;
+      }
+
+      .font-coffee {
+        font-family: 'Space Grotesk', sans-serif;
       }
       
       .glass {
@@ -135,7 +150,7 @@
 }
 </script>
 </head>
-<body class="selection:bg-blue-500/30">
+<body class="selection:bg-amber-900/30">
     <div id="root"></div>
 </body>
 </html>

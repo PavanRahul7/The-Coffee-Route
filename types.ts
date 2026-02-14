@@ -1,4 +1,3 @@
-
 export interface LatLng {
   lat: number;
   lng: number;
@@ -10,7 +9,7 @@ export enum Difficulty {
   HARD = 'Hard'
 }
 
-export type ThemeType = 'stealth' | 'solar' | 'neon' | 'forest';
+export type ThemeType = 'stealth' | 'solar' | 'neon' | 'forest' | 'barista';
 
 export interface Route {
   id: string;

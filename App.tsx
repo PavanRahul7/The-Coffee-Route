@@ -15,7 +15,7 @@ const App: React.FC = () => {
   const [trackingRoute, setTrackingRoute] = useState<Route | null>(null);
   const [editingRoute, setEditingRoute] = useState<Route | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [theme, setTheme] = useState<ThemeType>('stealth');
+  const [theme, setTheme] = useState<ThemeType>('barista');
 
   useEffect(() => {
     setRoutes(storageService.getRoutes());
@@ -29,7 +29,11 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const html = document.documentElement;
-    html.className = theme === 'stealth' ? 'dark' : (theme === 'solar' ? 'light theme-solar' : (theme === 'neon' ? 'dark theme-neon' : 'dark theme-forest'));
+    const themeClass = theme === 'stealth' ? 'dark' : 
+                      (theme === 'solar' ? 'light theme-solar' : 
+                      (theme === 'neon' ? 'dark theme-neon' : 
+                      (theme === 'forest' ? 'dark theme-forest' : 'dark theme-barista')));
+    html.className = themeClass;
   }, [theme]);
 
   const handleFinishRun = (run: RunHistory) => {
@@ -71,6 +75,7 @@ const App: React.FC = () => {
   );
 
   const themeOptions: { id: ThemeType; label: string; colors: string[] }[] = [
+    { id: 'barista', label: 'Barista', colors: ['#1a0f0a', '#d2b48c', '#fdf5e6'] },
     { id: 'stealth', label: 'Stealth', colors: ['#020617', '#3b82f6', '#10b981'] },
     { id: 'solar', label: 'Solar Flare', colors: ['#ffffff', '#f97316', '#0f172a'] },
     { id: 'neon', label: 'Neon Night', colors: ['#000000', '#d946ef', '#22d3ee'] },
@@ -82,9 +87,9 @@ const App: React.FC = () => {
       {/* Dynamic Header */}
       <header className="px-8 pt-12 pb-8 flex justify-between items-end z-40 bg-gradient-to-b from-[var(--bg-color)] to-transparent shrink-0">
         <div className="space-y-1">
-          <span className="text-[10px] font-bold tracking-[0.4em] uppercase opacity-30 ml-0.5">High Performance</span>
-          <h1 className="text-5xl font-display font-bold leading-none tracking-tight text-[var(--accent-primary)]">
-            ROUTE UP<span className="text-white opacity-10">/</span>
+          <span className="text-[10px] font-bold tracking-[0.4em] uppercase opacity-30 ml-0.5">Every run deserves a destination</span>
+          <h1 className="text-4xl sm:text-5xl font-display font-bold leading-none tracking-tight text-[var(--accent-primary)]">
+            COFFEE ROUTES<span className="text-[var(--text-main)] opacity-10">/</span>
           </h1>
         </div>
         
@@ -95,7 +100,7 @@ const App: React.FC = () => {
           >
             <div className="text-right hidden sm:block">
               <div className="text-xs font-bold leading-tight" style={{ color: 'var(--text-main)' }}>{profile.username}</div>
-              <div className="text-[9px] uppercase tracking-widest font-black opacity-40">{profile.stats.totalDistance.toFixed(0)} KM TOTAL</div>
+              <div className="text-[9px] uppercase tracking-widest font-black opacity-40">{profile.stats.totalDistance.toFixed(0)} KM BREWED</div>
             </div>
             <img src={profile.avatar} className="w-10 h-10 rounded-xl object-cover ring-2 ring-[var(--accent-primary)] ring-offset-2 ring-offset-[var(--bg-color)] shadow-xl" alt="User" />
           </button>
@@ -111,7 +116,7 @@ const App: React.FC = () => {
               <div className="absolute inset-0 bg-[var(--accent-primary)]/5 rounded-3xl blur-xl opacity-0 group-focus-within:opacity-100 transition-opacity" />
               <input 
                 type="text"
-                placeholder="Where next, {profile?.username || 'runner'}?"
+                placeholder="Find a coffee shop path..."
                 className="relative w-full bg-[var(--card-bg)] border border-[var(--border-color)] rounded-3xl py-6 pl-16 pr-6 text-[var(--text-main)] font-semibold text-lg focus:outline-none focus:ring-2 ring-[var(--accent-primary)]/30 transition-all placeholder:text-[var(--text-muted)]/40"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
@@ -125,8 +130,8 @@ const App: React.FC = () => {
             {!searchQuery && (
               <section className="space-y-6">
                 <div className="flex justify-between items-end px-1">
-                  <h2 className="text-xs font-black uppercase tracking-[0.3em] opacity-40">Featured Tracks</h2>
-                  <span className="text-[10px] font-bold opacity-30">VIEW ALL</span>
+                  <h2 className="text-xs font-black uppercase tracking-[0.3em] opacity-40 font-coffee">Staff Picks</h2>
+                  <span className="text-[10px] font-bold opacity-30">ROASTED RECENTLY</span>
                 </div>
                 <div className="flex gap-6 overflow-x-auto pb-6 -mx-8 px-8 snap-x">
                    {routes.slice(0, 3).map(route => (
@@ -150,7 +155,7 @@ const App: React.FC = () => {
             {/* List */}
             <section className="space-y-8">
               <div className="flex justify-between items-end px-1">
-                <h2 className="text-xs font-black uppercase tracking-[0.3em] opacity-40">Discovery Feed</h2>
+                <h2 className="text-xs font-black uppercase tracking-[0.3em] opacity-40 font-coffee">Daily Brews</h2>
                 <div className="flex gap-3">
                    <div className="w-2 h-2 rounded-full bg-[var(--accent-primary)]"></div>
                    <div className="w-2 h-2 rounded-full bg-white/10"></div>
@@ -190,7 +195,7 @@ const App: React.FC = () => {
                             <span>{route.rating} ★</span>
                           </div>
                         </div>
-                        <div className="bg-[var(--accent-primary)] px-5 py-2.5 rounded-2xl text-[10px] font-black tracking-widest text-white shadow-2xl shadow-[var(--accent-primary)]/40 uppercase">
+                        <div className="bg-[var(--accent-primary)] px-5 py-2.5 rounded-2xl text-[10px] font-black tracking-widest text-[var(--bg-color)] shadow-2xl shadow-[var(--accent-primary)]/40 uppercase">
                           {route.distance.toFixed(1)} KM
                         </div>
                       </div>
@@ -205,9 +210,9 @@ const App: React.FC = () => {
         {activeTab === 'runs' && (
           <div className="space-y-10 fade-slide-up">
             <div className="flex justify-between items-center">
-              <h2 className="text-4xl font-display font-bold text-[var(--text-main)]">SESSIONS</h2>
+              <h2 className="text-4xl font-display font-bold text-[var(--text-main)]">PAST BREWS</h2>
               <div className="bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] px-5 py-2 rounded-full border border-[var(--accent-primary)]/20 text-[10px] font-black uppercase tracking-[0.2em]">
-                {runs.length} RECORDED
+                {runs.length} SESSIONS
               </div>
             </div>
             
@@ -216,7 +221,7 @@ const App: React.FC = () => {
                 <div key={run.id} className="group bg-[var(--card-bg)] rounded-[3rem] p-8 border border-[var(--border-color)] hover:border-[var(--accent-primary)]/40 transition-all card-shadow">
                   <div className="flex justify-between items-start mb-8">
                     <div className="space-y-1">
-                      <span className="text-[10px] font-black uppercase tracking-[0.3em] text-[var(--accent-primary)]">Training Data</span>
+                      <span className="text-[10px] font-black uppercase tracking-[0.3em] text-[var(--accent-primary)]">Roast Summary</span>
                       <h4 className="text-3xl font-bold text-[var(--text-main)] tracking-tight leading-none">{run.routeName}</h4>
                       <div className="text-xs font-medium opacity-40 uppercase tracking-widest pt-1">{new Date(run.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</div>
                     </div>
@@ -232,7 +237,7 @@ const App: React.FC = () => {
                       <span className="text-2xl font-display">{Math.floor(run.duration / 60)}:{(run.duration % 60).toString().padStart(2, '0')}</span>
                     </div>
                     <div className="bg-[var(--bg-color)]/60 p-6 rounded-[2rem] border border-white/5 shadow-inner flex flex-col items-center">
-                      <span className="text-[9px] uppercase font-black tracking-[0.2em] opacity-30 mb-2">Avg Pace</span>
+                      <span className="text-[9px] uppercase font-black tracking-[0.2em] opacity-30 mb-2">Pace</span>
                       <span className="text-2xl font-display text-[var(--accent-secondary)]">{run.averagePace}</span>
                     </div>
                   </div>
@@ -243,7 +248,7 @@ const App: React.FC = () => {
                          <svg className="w-16 h-16" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
                       </div>
                       <div className="flex items-center gap-3 mb-4">
-                         <span className="text-[10px] font-black uppercase tracking-[0.3em] text-[var(--accent-primary)]">AI Coach Insights</span>
+                         <span className="text-[10px] font-black uppercase tracking-[0.3em] text-[var(--accent-primary)]">Barista Insights</span>
                       </div>
                       <p className="text-sm italic font-medium leading-relaxed opacity-80">{run.coachingTips}</p>
                     </div>
@@ -262,7 +267,7 @@ const App: React.FC = () => {
                 <div className="w-48 h-48 rounded-[4rem] p-1.5 border-2 border-[var(--border-color)] overflow-hidden shadow-2xl mx-auto rotate-3">
                    <img src={profile.avatar} className="w-full h-full rounded-[3.8rem] object-cover -rotate-3 hover:rotate-0 transition-transform duration-500" alt="Avatar" />
                 </div>
-                <button className="absolute -bottom-2 -right-2 bg-[var(--accent-primary)] p-5 rounded-3xl text-white shadow-2xl hover:scale-110 active:scale-90 transition-all card-shadow">
+                <button className="absolute -bottom-2 -right-2 bg-[var(--accent-primary)] p-5 rounded-3xl text-[var(--bg-color)] shadow-2xl hover:scale-110 active:scale-90 transition-all card-shadow">
                   <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                   </svg>
@@ -279,18 +284,18 @@ const App: React.FC = () => {
               </div>
               <div className="bg-[var(--card-bg)] p-8 rounded-[3rem] text-center border border-[var(--border-color)] card-shadow">
                 <div className="text-4xl font-display mb-1 text-[var(--accent-secondary)]">{profile.stats.totalRuns}</div>
-                <div className="text-[9px] font-black uppercase tracking-[0.3em] opacity-30">SESSIONS</div>
+                <div className="text-[9px] font-black uppercase tracking-[0.3em] opacity-30">CUPS RUN</div>
               </div>
               <div className="bg-[var(--card-bg)] p-8 rounded-[3rem] text-center border border-[var(--border-color)] card-shadow">
                 <div className="text-4xl font-display mb-1 text-orange-500">4:52</div>
-                <div className="text-[9px] font-black uppercase tracking-[0.3em] opacity-30">BEST PACE</div>
+                <div className="text-[9px] font-black uppercase tracking-[0.3em] opacity-30">TOP PACE</div>
               </div>
             </div>
 
             {/* Customization Grid */}
             <section className="space-y-8">
               <div className="px-1 space-y-1">
-                <h3 className="text-xs font-black uppercase tracking-[0.4em] opacity-30">Visual Profile</h3>
+                <h3 className="text-xs font-black uppercase tracking-[0.4em] opacity-30">Roast Profile</h3>
                 <p className="text-[10px] font-bold opacity-20">Tailor the high-performance interface.</p>
               </div>
               <div className="grid grid-cols-2 gap-6">
@@ -328,7 +333,7 @@ const App: React.FC = () => {
           className="fixed right-10 bottom-36 w-20 h-20 rounded-[2rem] shadow-2xl z-40 btn-active flex items-center justify-center rotate-6 hover:rotate-12 transition-all group overflow-hidden bg-[var(--accent-primary)]"
         >
           <div className="absolute inset-0 bg-white/30 opacity-0 group-hover:opacity-100 transition-opacity" />
-          <svg className="h-10 w-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="h-10 w-10 text-[var(--bg-color)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M12 4v16m8-8H4" />
           </svg>
         </button>

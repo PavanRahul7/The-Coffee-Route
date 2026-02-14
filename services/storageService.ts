@@ -1,4 +1,3 @@
-
 import { Route, RunHistory, UserProfile, Difficulty } from '../types';
 
 const KEYS = {
@@ -9,9 +8,9 @@ const KEYS = {
 
 const INITIAL_PROFILE: UserProfile = {
   id: 'user_1',
-  username: 'RunnerOne',
-  avatar: 'https://picsum.photos/200',
-  bio: 'Chasing sunsets and personal bests.',
+  username: 'CaffeineRunner',
+  avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&h=400&fit=crop',
+  bio: 'Running for the roast. Every run deserves a destination.',
   stats: {
     totalDistance: 0,
     totalRuns: 0,
@@ -22,31 +21,45 @@ const INITIAL_PROFILE: UserProfile = {
 const INITIAL_ROUTES: Route[] = [
   {
     id: 'r1',
-    name: 'Coastal Sprint',
-    description: 'A beautiful flat route along the harbor.',
+    name: 'Espresso Harbor Run',
+    description: 'A crisp coastal loop ending at The Roastery for a perfect double shot.',
     creatorId: 'user_1',
-    creatorName: 'RunnerOne',
+    creatorName: 'CaffeineRunner',
     path: [{ lat: 37.7749, lng: -122.4194 }, { lat: 37.7849, lng: -122.4094 }],
     distance: 5.2,
     elevationGain: 12,
     difficulty: Difficulty.EASY,
-    tags: ['scenic', 'flat'],
+    tags: ['coffee', 'scenic', 'flat'],
     createdAt: Date.now(),
-    rating: 4.5
+    rating: 4.8
   },
   {
     id: 'r2',
-    name: 'Hill Thriller',
-    description: 'Test your lungs on these steep inclines.',
+    name: 'Cortado Hill Climb',
+    description: 'Tough elevation gains rewarding you with the best micro-foam in the city.',
     creatorId: 'user_1',
-    creatorName: 'RunnerOne',
+    creatorName: 'CaffeineRunner',
     path: [{ lat: 37.7949, lng: -122.4294 }, { lat: 37.8049, lng: -122.4394 }],
     distance: 8.4,
     elevationGain: 245,
     difficulty: Difficulty.HARD,
-    tags: ['trail', 'hills'],
+    tags: ['trail', 'hills', 'destination'],
     createdAt: Date.now(),
-    rating: 4.8
+    rating: 4.9
+  },
+  {
+    id: 'r3',
+    name: 'Latte Art Parkway',
+    description: 'Smooth asphalt through the park, passing three specialty cafes.',
+    creatorId: 'user_1',
+    creatorName: 'BaristaRun',
+    path: [{ lat: 37.7649, lng: -122.4494 }, { lat: 37.7549, lng: -122.4594 }],
+    distance: 4.0,
+    elevationGain: 35,
+    difficulty: Difficulty.MODERATE,
+    tags: ['park', 'urban', 'coffee'],
+    createdAt: Date.now(),
+    rating: 4.6
   }
 ];
 
@@ -82,7 +95,10 @@ export const storageService = {
   },
   getProfile: (): UserProfile => {
     const data = localStorage.getItem(KEYS.PROFILE);
-    return data ? JSON.parse(data) : INITIAL_PROFILE;
+    const stored = data ? JSON.parse(data) : INITIAL_PROFILE;
+    // Ensure default theme for new barista branding
+    if (!stored.theme) stored.theme = 'barista';
+    return stored;
   },
   saveProfile: (profile: UserProfile) => {
     localStorage.setItem(KEYS.PROFILE, JSON.stringify(profile));
