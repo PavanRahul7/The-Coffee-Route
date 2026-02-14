@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { Route, RunHistory, LatLng } from "../types";
 
@@ -25,6 +26,19 @@ export const geminiService = {
       return JSON.parse(jsonStr);
     } catch (e) {
       console.error('Geocoding error:', e);
+      return null;
+    }
+  },
+
+  async reverseGeocode(lat: number, lng: number): Promise<string | null> {
+    try {
+      const response = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: `Identify the city and region/country for these coordinates: Lat ${lat}, Lng ${lng}. Return ONLY a short string like "Brooklyn, NY" or "Shinjuku, Tokyo". Do not include any other text.`,
+      });
+      return response.text.trim() || null;
+    } catch (e) {
+      console.error('Reverse geocoding error:', e);
       return null;
     }
   },

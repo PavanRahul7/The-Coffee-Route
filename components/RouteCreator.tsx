@@ -28,6 +28,8 @@ const RouteCreator: React.FC<RouteCreatorProps> = ({ onSave, onCancel, initialRo
   const [tags, setTags] = useState<string[]>(initialRoute?.tags || []);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
+  const [detectedRegion, setDetectedRegion] = useState<string | null>(null);
+  const [isLocating, setIsLocating] = useState(false);
   
   const [isSaving, setIsSaving] = useState(false);
   const [isSnapping, setIsSnapping] = useState(false);
@@ -42,7 +44,7 @@ const RouteCreator: React.FC<RouteCreatorProps> = ({ onSave, onCancel, initialRo
 
   useEffect(() => {
     let timeout: number;
-    const accentColor = getComputedStyle(document.documentElement).getPropertyValue('--accent-primary').trim() || '#3b82f6';
+    const accentColor = getComputedStyle(document.documentElement).getPropertyValue('--accent-primary').trim() || '#d2b48c';
     
     const initMap = () => {
       if (typeof L === 'undefined') {
@@ -87,10 +89,13 @@ const RouteCreator: React.FC<RouteCreatorProps> = ({ onSave, onCancel, initialRo
           updateMarkers(initialRoute.path, []);
           mapInstance.current.fitBounds(polylineRef.current.getBounds(), { padding: [50, 50] });
           calculateDistance(initialRoute.path);
+        } else {
+          // Automatic detection on load for new routes
+          handleDetectLocation();
         }
 
         window.setTimeout(() => {
-          mapInstance.current.invalidateSize();
+          if (mapInstance.current) mapInstance.current.invalidateSize();
         }, 300);
       }
     };
@@ -106,6 +111,28 @@ const RouteCreator: React.FC<RouteCreatorProps> = ({ onSave, onCancel, initialRo
     };
   }, []);
 
+  const handleDetectLocation = () => {
+    if (!navigator.geolocation) return;
+    setIsLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const { latitude, longitude } = pos.coords;
+        if (mapInstance.current) {
+          mapInstance.current.setView([latitude, longitude], 15, { animate: true });
+        }
+        // AI detected region name
+        const region = await geminiService.reverseGeocode(latitude, longitude);
+        setDetectedRegion(region);
+        setIsLocating(false);
+      },
+      (err) => {
+        console.error("Location detection failed", err);
+        setIsLocating(false);
+      },
+      { enableHighAccuracy: true }
+    );
+  };
+
   const handleLocationSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!searchQuery.trim() || !mapInstance.current) return;
@@ -113,6 +140,8 @@ const RouteCreator: React.FC<RouteCreatorProps> = ({ onSave, onCancel, initialRo
     const coords = await geminiService.geocodeLocation(searchQuery);
     if (coords) {
       mapInstance.current.setView([coords.lat, coords.lng], 15, { animate: true });
+      const region = await geminiService.reverseGeocode(coords.lat, coords.lng);
+      setDetectedRegion(region);
     }
     setIsSearching(false);
   };
@@ -177,7 +206,7 @@ const RouteCreator: React.FC<RouteCreatorProps> = ({ onSave, onCancel, initialRo
     waypointMarkersRef.current = [];
 
     const accentSec = getComputedStyle(document.documentElement).getPropertyValue('--accent-secondary').trim() || '#10b981';
-    const accentPri = getComputedStyle(document.documentElement).getPropertyValue('--accent-primary').trim() || '#3b82f6';
+    const accentPri = getComputedStyle(document.documentElement).getPropertyValue('--accent-primary').trim() || '#d2b48c';
 
     const createIcon = (color: string, size: number) => L.divIcon({
       className: 'custom-div-icon',
@@ -235,7 +264,6 @@ const RouteCreator: React.FC<RouteCreatorProps> = ({ onSave, onCancel, initialRo
     });
   };
 
-  // Implemented missing handleClear function
   const handleClear = () => {
     setSegments([]);
     if (polylineRef.current) polylineRef.current.setLatLngs([]);
@@ -277,7 +305,7 @@ const RouteCreator: React.FC<RouteCreatorProps> = ({ onSave, onCancel, initialRo
   };
 
   return (
-    <div className="fixed inset-0 z-[110] app-bg flex flex-col overflow-hidden animate-in fade-in transition-colors duration-500">
+    <div className="fixed inset-0 z-[110] bg-[var(--bg-color)] flex flex-col overflow-hidden animate-in fade-in transition-colors duration-500">
       <div className="relative flex-1 bg-slate-900">
         <div ref={mapRef} className="w-full h-full" />
         
@@ -302,8 +330,8 @@ const RouteCreator: React.FC<RouteCreatorProps> = ({ onSave, onCancel, initialRo
 
         {/* HUD Overlay - Top */}
         <div className="absolute top-12 left-8 right-8 z-[1000] flex flex-col gap-4">
-          <div className="flex gap-4">
-            <button onClick={onCancel} className="glass p-5 rounded-3xl text-[var(--text-main)] shadow-2xl active:scale-90 transition-all">
+          <div className="flex gap-3">
+            <button onClick={onCancel} className="glass p-5 rounded-3xl text-[var(--text-main)] shadow-2xl active:scale-90 transition-all shrink-0">
               <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 19l-7-7 7-7" /></svg>
             </button>
             <form onSubmit={handleLocationSearch} className="flex-1 relative group">
@@ -316,11 +344,28 @@ const RouteCreator: React.FC<RouteCreatorProps> = ({ onSave, onCancel, initialRo
               <svg className="absolute left-6 top-1/2 -translate-y-1/2 h-5 w-5 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
               {isSearching && <div className="absolute right-6 top-1/2 -translate-y-1/2 animate-spin h-5 w-5 border-2 border-[var(--accent-primary)] border-t-transparent rounded-full"></div>}
             </form>
+            <button 
+              type="button"
+              onClick={handleDetectLocation}
+              className={`glass p-5 rounded-3xl shadow-2xl active:scale-90 transition-all shrink-0 ${isLocating ? 'text-[var(--accent-primary)] animate-pulse' : 'text-white/40 hover:text-white'}`}
+            >
+              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            </button>
           </div>
 
-          <div className="glass px-8 py-4 rounded-[2rem] flex items-center gap-4 animate-in slide-in-from-top-4 duration-500">
-            <span className="text-[10px] font-black uppercase tracking-[0.3em] opacity-40">Name</span>
-            <input value={name} onChange={e => setName(e.target.value)} placeholder="Route Name..." className="bg-transparent text-lg font-bold text-white focus:outline-none flex-1 placeholder:text-white/10" />
+          <div className="flex flex-col gap-2">
+            <div className="glass px-8 py-4 rounded-[2rem] flex items-center gap-4 animate-in slide-in-from-top-4 duration-500">
+              <span className="text-[10px] font-black uppercase tracking-[0.3em] opacity-40">Name</span>
+              <input value={name} onChange={e => setName(e.target.value)} placeholder="Route Name..." className="bg-transparent text-lg font-bold text-white focus:outline-none flex-1 placeholder:text-white/10" />
+            </div>
+            {detectedRegion && (
+              <div className="bg-[var(--accent-primary)]/20 self-start px-5 py-2 rounded-full border border-[var(--accent-primary)]/30 animate-in fade-in duration-700">
+                <span className="text-[10px] font-black uppercase tracking-widest text-[var(--accent-primary)]">Manning Tracks in {detectedRegion}</span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -336,7 +381,7 @@ const RouteCreator: React.FC<RouteCreatorProps> = ({ onSave, onCancel, initialRo
 
         {/* Footer Dashboard */}
         <div className="absolute bottom-12 left-8 right-8 z-[1000] glass p-10 rounded-[3.5rem] shadow-2xl">
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-6">
             <div className="flex gap-16">
               <div className="space-y-1">
                 <span className="text-[10px] font-black uppercase tracking-[0.4em] opacity-30 font-display">Distance</span>
@@ -350,7 +395,7 @@ const RouteCreator: React.FC<RouteCreatorProps> = ({ onSave, onCancel, initialRo
             <button 
               disabled={distance === 0 || !name || isSaving}
               onClick={handleSave}
-              className="bg-[var(--accent-primary)] text-white font-black py-6 px-12 rounded-3xl shadow-2xl shadow-[var(--accent-primary)]/40 transition-all flex items-center gap-4 active:scale-95 font-display text-2xl tracking-widest disabled:opacity-20"
+              className="w-full sm:w-auto bg-[var(--accent-primary)] text-[var(--bg-color)] font-black py-6 px-12 rounded-3xl shadow-2xl shadow-[var(--accent-primary)]/40 transition-all flex items-center justify-center gap-4 active:scale-95 font-display text-2xl tracking-widest disabled:opacity-20"
             >
               {isSaving ? 'UPLOADING...' : 'SAVE TRACK'}
             </button>
