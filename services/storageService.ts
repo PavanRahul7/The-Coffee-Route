@@ -1,9 +1,10 @@
-import { Route, RunHistory, UserProfile, Difficulty } from '../types';
+import { Route, RunHistory, UserProfile, Difficulty, RunClub } from '../types';
 
 const KEYS = {
   ROUTES: 'velocity_routes',
   RUNS: 'velocity_runs',
   PROFILE: 'velocity_profile',
+  CLUBS: 'velocity_clubs',
 };
 
 const INITIAL_PROFILE: UserProfile = {
@@ -11,6 +12,7 @@ const INITIAL_PROFILE: UserProfile = {
   username: 'CaffeineRunner',
   avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&h=400&fit=crop',
   bio: 'Running for the roast. Every run deserves a destination.',
+  joinedClubIds: ['c1'],
   stats: {
     totalDistance: 0,
     totalRuns: 0,
@@ -63,6 +65,42 @@ const INITIAL_ROUTES: Route[] = [
   }
 ];
 
+const INITIAL_CLUBS: RunClub[] = [
+  {
+    id: 'c1',
+    name: 'The Espresso Express',
+    description: 'High-speed morning sessions followed by immediate caffeine intake.',
+    logo: 'https://images.unsplash.com/photo-1511920170033-f8396924c348?w=200&h=200&fit=crop',
+    memberCount: 124,
+    weeklyRouteId: 'r1',
+    meetingTime: 'Tuesdays @ 6:30 AM',
+    location: 'Pier 39, Harbor View',
+    creatorId: 'system'
+  },
+  {
+    id: 'c2',
+    name: 'Brew Crew Runners',
+    description: 'Community-focused club exploring hidden neighborhood coffee gems.',
+    logo: 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=200&h=200&fit=crop',
+    memberCount: 89,
+    weeklyRouteId: 'r3',
+    meetingTime: 'Saturdays @ 9:00 AM',
+    location: 'Central Park North',
+    creatorId: 'system'
+  },
+  {
+    id: 'c3',
+    name: 'Steep & Sprint',
+    description: 'Hill training experts who believe the best view is from the top of the hill with a cortado.',
+    logo: 'https://images.unsplash.com/photo-1447933630913-bb79912e47b4?w=200&h=200&fit=crop',
+    memberCount: 56,
+    weeklyRouteId: 'r2',
+    meetingTime: 'Thursdays @ 6:00 PM',
+    location: 'Mountain View Summit',
+    creatorId: 'system'
+  }
+];
+
 export const storageService = {
   getRoutes: (): Route[] => {
     const data = localStorage.getItem(KEYS.ROUTES);
@@ -96,11 +134,32 @@ export const storageService = {
   getProfile: (): UserProfile => {
     const data = localStorage.getItem(KEYS.PROFILE);
     const stored = data ? JSON.parse(data) : INITIAL_PROFILE;
-    // Ensure default theme for new barista branding
+    // Migration for joinedClubIds
+    if (!stored.joinedClubIds) stored.joinedClubIds = [];
     if (!stored.theme) stored.theme = 'barista';
     return stored;
   },
   saveProfile: (profile: UserProfile) => {
     localStorage.setItem(KEYS.PROFILE, JSON.stringify(profile));
+  },
+  getClubs: (): RunClub[] => {
+    const data = localStorage.getItem(KEYS.CLUBS);
+    return data ? JSON.parse(data) : INITIAL_CLUBS;
+  },
+  saveClub: (club: RunClub) => {
+    const clubs = storageService.getClubs();
+    const updated = [club, ...clubs];
+    localStorage.setItem(KEYS.CLUBS, JSON.stringify(updated));
+  },
+  toggleClubMembership: (clubId: string) => {
+    const profile = storageService.getProfile();
+    const index = profile.joinedClubIds.indexOf(clubId);
+    if (index > -1) {
+      profile.joinedClubIds.splice(index, 1);
+    } else {
+      profile.joinedClubIds.push(clubId);
+    }
+    storageService.saveProfile(profile);
+    return profile;
   }
 };

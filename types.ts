@@ -26,6 +26,18 @@ export interface Route {
   rating: number;
 }
 
+export interface RunClub {
+  id: string;
+  name: string;
+  description: string;
+  logo: string;
+  memberCount: number;
+  weeklyRouteId: string;
+  meetingTime: string;
+  location: string;
+  creatorId: string;
+}
+
 export interface RunHistory {
   id: string;
   routeId: string;
@@ -44,6 +56,7 @@ export interface UserProfile {
   avatar: string;
   bio: string;
   theme?: ThemeType;
+  joinedClubIds: string[];
   stats: {
     totalDistance: number;
     totalRuns: number;
@@ -51,4 +64,4 @@ export interface UserProfile {
   };
 }
 
-export type AppTab = 'explore' | 'create' | 'runs' | 'profile';
+export type AppTab = 'explore' | 'clubs' | 'create' | 'runs' | 'profile';

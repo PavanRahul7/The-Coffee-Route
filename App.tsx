@@ -1,24 +1,28 @@
 import React, { useState, useEffect } from 'react';
-import { AppTab, Route, RunHistory, UserProfile, Difficulty, ThemeType } from './types';
+import { AppTab, Route, RunHistory, UserProfile, Difficulty, ThemeType, RunClub } from './types';
 import { storageService } from './services/storageService';
 import BottomNav from './components/BottomNav';
 import RouteDetail from './components/RouteDetail';
 import LiveTracking from './components/LiveTracking';
 import RouteCreator from './components/RouteCreator';
+import ClubCreator from './components/ClubCreator';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<AppTab>('explore');
   const [routes, setRoutes] = useState<Route[]>([]);
+  const [clubs, setClubs] = useState<RunClub[]>([]);
   const [runs, setRuns] = useState<RunHistory[]>([]);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [selectedRoute, setSelectedRoute] = useState<Route | null>(null);
   const [trackingRoute, setTrackingRoute] = useState<Route | null>(null);
   const [editingRoute, setEditingRoute] = useState<Route | null>(null);
+  const [isAddingClub, setIsAddingClub] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [theme, setTheme] = useState<ThemeType>('barista');
 
   useEffect(() => {
     setRoutes(storageService.getRoutes());
+    setClubs(storageService.getClubs());
     setRuns(storageService.getRuns());
     const p = storageService.getProfile();
     setProfile(p);
@@ -58,6 +62,21 @@ const App: React.FC = () => {
   const handleEditRoute = (route: Route) => {
     setSelectedRoute(null);
     setEditingRoute(route);
+  };
+
+  const handleSaveClub = (club: RunClub) => {
+    storageService.saveClub(club);
+    setClubs([club, ...clubs]);
+    // Auto join created club
+    const updatedProfile = storageService.toggleClubMembership(club.id);
+    setProfile(updatedProfile);
+    setIsAddingClub(false);
+  };
+
+  const toggleJoinClub = (e: React.MouseEvent, clubId: string) => {
+    e.stopPropagation();
+    const updatedProfile = storageService.toggleClubMembership(clubId);
+    setProfile(updatedProfile);
   };
 
   const handleThemeChange = (newTheme: ThemeType) => {
@@ -207,6 +226,91 @@ const App: React.FC = () => {
           </div>
         )}
 
+        {activeTab === 'clubs' && (
+          <div className="space-y-10 fade-slide-up">
+            <div className="flex justify-between items-end">
+              <div className="space-y-1">
+                <h2 className="text-4xl font-display font-bold text-[var(--text-main)]">RUN CLUBS</h2>
+                <p className="text-xs font-bold opacity-30 uppercase tracking-[0.2em]">Community Roast Circles</p>
+              </div>
+              <button 
+                onClick={() => setIsAddingClub(true)}
+                className="bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] px-5 py-2 rounded-full border border-[var(--accent-primary)]/20 text-[10px] font-black uppercase tracking-[0.2em] hover:bg-[var(--accent-primary)]/20 active:scale-95 transition-all"
+              >
+                + NEW CIRCLE
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {clubs.map(club => {
+                const weeklyRoute = routes.find(r => r.id === club.weeklyRouteId);
+                const isJoined = profile?.joinedClubIds.includes(club.id);
+                return (
+                  <div 
+                    key={club.id} 
+                    className="bg-[var(--card-bg)] rounded-[3rem] border border-[var(--border-color)] overflow-hidden transition-all duration-500 card-shadow group"
+                  >
+                    <div className="p-8 flex gap-6">
+                      <img src={club.logo} className="w-24 h-24 rounded-3xl object-cover ring-2 ring-[var(--accent-primary)]/20 shadow-xl" alt={club.name} />
+                      <div className="flex-1 space-y-2">
+                        <div className="flex justify-between items-start">
+                          <h3 className="text-2xl font-bold group-hover:text-[var(--accent-primary)] transition-colors">{club.name}</h3>
+                          <button 
+                            onClick={(e) => toggleJoinClub(e, club.id)}
+                            className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all ${
+                              isJoined 
+                                ? 'bg-[var(--accent-primary)] border-[var(--accent-primary)] text-[var(--bg-color)]' 
+                                : 'bg-transparent border-[var(--border-color)] text-[var(--text-main)]/40 hover:text-white hover:border-white/20'
+                            }`}
+                          >
+                            {isJoined ? 'JOINED' : 'JOIN CLUB'}
+                          </button>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="text-[10px] font-black uppercase tracking-widest opacity-40">{club.memberCount + (isJoined && club.creatorId !== 'user_1' ? 1 : 0)} MEMBERS</span>
+                          <span className="w-1 h-1 rounded-full bg-white/10"></span>
+                          <span className="text-[10px] font-black uppercase tracking-widest text-[var(--accent-secondary)]">{club.location}</span>
+                        </div>
+                        <p className="text-sm opacity-60 leading-relaxed line-clamp-2">{club.description}</p>
+                      </div>
+                    </div>
+                    
+                    {weeklyRoute && (
+                      <div className="px-8 pb-8">
+                        <div className="bg-[var(--bg-color)]/50 rounded-[2.5rem] p-6 border border-white/5 space-y-4">
+                          <div className="flex justify-between items-center">
+                            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-[var(--accent-primary)]">This Week's Roast</span>
+                            <span className="text-[10px] font-black uppercase tracking-widest opacity-30">{club.meetingTime}</span>
+                          </div>
+                          <div 
+                            onClick={() => setSelectedRoute(weeklyRoute)}
+                            className="flex items-center justify-between cursor-pointer group/route"
+                          >
+                            <div className="flex items-center gap-4">
+                              <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center group-hover/route:bg-[var(--accent-primary)] transition-colors">
+                                <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                                </svg>
+                              </div>
+                              <div className="space-y-0.5">
+                                <div className="text-lg font-bold group-hover/route:text-[var(--accent-primary)] transition-colors">{weeklyRoute.name}</div>
+                                <div className="text-[10px] font-black uppercase tracking-widest opacity-30">{weeklyRoute.distance} KM • {weeklyRoute.difficulty}</div>
+                              </div>
+                            </div>
+                            <svg className="w-6 h-6 opacity-20 group-hover/route:opacity-100 group-hover/route:translate-x-1 transition-all" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 5l7 7-7 7" />
+                            </svg>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {activeTab === 'runs' && (
           <div className="space-y-10 fade-slide-up">
             <div className="flex justify-between items-center">
@@ -292,6 +396,34 @@ const App: React.FC = () => {
               </div>
             </div>
 
+            {/* Joined Clubs List */}
+            {profile.joinedClubIds.length > 0 && (
+              <section className="space-y-6">
+                <h3 className="text-xs font-black uppercase tracking-[0.4em] opacity-30">Your Circles</h3>
+                <div className="space-y-4">
+                  {profile.joinedClubIds.map(id => {
+                    const club = clubs.find(c => c.id === id);
+                    if (!club) return null;
+                    return (
+                      <div key={id} className="flex items-center gap-4 bg-[var(--card-bg)] p-4 rounded-3xl border border-[var(--border-color)]">
+                        <img src={club.logo} className="w-12 h-12 rounded-xl object-cover" alt={club.name} />
+                        <div className="flex-1">
+                          <div className="font-bold text-sm">{club.name}</div>
+                          <div className="text-[9px] font-black uppercase tracking-widest opacity-30">{club.meetingTime}</div>
+                        </div>
+                        <button 
+                          onClick={(e) => toggleJoinClub(e, club.id)}
+                          className="text-[9px] font-black uppercase tracking-widest text-red-500/50 hover:text-red-500 px-3 py-1.5"
+                        >
+                          LEAVE
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
+
             {/* Customization Grid */}
             <section className="space-y-8">
               <div className="px-1 space-y-1">
@@ -371,6 +503,14 @@ const App: React.FC = () => {
             setEditingRoute(null);
           }}
           initialRoute={editingRoute || undefined}
+        />
+      )}
+
+      {isAddingClub && (
+        <ClubCreator 
+          routes={routes}
+          onSave={handleSaveClub}
+          onCancel={() => setIsAddingClub(false)}
         />
       )}
     </div>

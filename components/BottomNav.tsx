@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { AppTab } from '../types';
 
@@ -15,6 +14,15 @@ const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onTabChange }) => {
       icon: (active) => (
         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        </svg>
+      ) 
+    },
+    { 
+      id: 'clubs', 
+      label: 'Clubs', 
+      icon: (active) => (
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
         </svg>
       ) 
     },
@@ -49,14 +57,14 @@ const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onTabChange }) => {
 
   return (
     <div className="fixed bottom-10 left-0 right-0 z-50 px-6 flex justify-center pointer-events-none">
-      <nav className="glass max-w-lg w-full rounded-[2.5rem] px-4 py-3 flex justify-around items-center pointer-events-auto shadow-2xl">
+      <nav className="glass max-w-xl w-full rounded-[2.5rem] px-4 py-3 flex justify-around items-center pointer-events-auto shadow-2xl">
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
           return (
             <button
               key={tab.id}
               onClick={() => onTabChange(tab.id)}
-              className={`relative flex flex-col items-center justify-center py-2 px-6 rounded-3xl transition-all duration-300 btn-active ${
+              className={`relative flex flex-col items-center justify-center py-2 px-4 sm:px-6 rounded-3xl transition-all duration-300 btn-active ${
                 isActive ? 'scale-110' : 'opacity-40 hover:opacity-100'
               }`}
             >
