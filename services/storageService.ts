@@ -8,25 +8,14 @@ const KEYS = {
   CLUBS: 'velocity_clubs',
   REVIEWS: 'velocity_reviews',
   USERS: 'velocity_all_users',
+  ACTIVE_SESSION: 'velocity_active_session',
+  CREDENTIALS: 'velocity_credentials',
+  REMEMBER_ME: 'velocity_remember_me',
 };
 
-const INITIAL_PROFILE: UserProfile = {
-  id: 'user_1',
-  username: 'New Roaster',
-  avatar: 'https://images.unsplash.com/photo-1476480862126-209bfaa8edc8?w=400&h=400&fit=crop',
-  bio: 'Just starting my journey. Every run deserves a destination.',
-  joinedClubIds: [],
-  friendIds: ['u_2', 'u_3'],
-  isSetup: false,
-  unitSystem: 'metric',
-  stats: {
-    totalDistance: 0,
-    totalRuns: 0,
-    avgPace: '0:00'
-  }
-};
+const DEFAULT_AVATAR = 'https://images.unsplash.com/photo-1476480862126-209bfaa8edc8?w=400&h=400&fit=crop';
 
-const DISCOVERY_USERS: UserProfile[] = [
+const MOCK_USERS: UserProfile[] = [
   {
     id: 'u_2',
     username: 'TrailBlazer',
@@ -35,7 +24,7 @@ const DISCOVERY_USERS: UserProfile[] = [
     joinedClubIds: ['c1'],
     friendIds: [],
     isSetup: true,
-    unitSystem: 'metric',
+    unitSystem: 'imperial',
     stats: { totalDistance: 142, totalRuns: 28, avgPace: '5:12' }
   },
   {
@@ -46,21 +35,17 @@ const DISCOVERY_USERS: UserProfile[] = [
     joinedClubIds: ['c1'],
     friendIds: [],
     isSetup: true,
-    unitSystem: 'metric',
+    unitSystem: 'imperial',
     stats: { totalDistance: 89, totalRuns: 15, avgPace: '6:05' }
-  },
-  {
-    id: 'u_4',
-    username: 'TempoRunner',
-    avatar: 'https://images.unsplash.com/photo-1452626038306-9aae5e071dd3?w=400&h=400&fit=crop',
-    bio: 'Consistency is my only goal.',
-    joinedClubIds: [],
-    friendIds: [],
-    isSetup: true,
-    unitSystem: 'metric',
-    stats: { totalDistance: 210, totalRuns: 42, avgPace: '5:45' }
   }
 ];
+
+async function hashPassword(password: string): Promise<string> {
+  const msgBuffer = new TextEncoder().encode(password);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
 
 export const storageService = {
   getRoutes: (): Route[] => {
@@ -87,36 +72,130 @@ export const storageService = {
     localStorage.setItem(KEYS.RUNS, JSON.stringify(updated));
     
     const profile = storageService.getProfile();
-    profile.stats.totalDistance += run.distance;
-    profile.stats.totalRuns += 1;
-    // Simple average update for demo
-    profile.stats.avgPace = run.averagePace; 
-    storageService.saveProfile(profile);
+    if (profile) {
+      profile.stats.totalDistance += run.distance;
+      profile.stats.totalRuns += 1;
+      profile.stats.avgPace = run.averagePace; 
+      storageService.saveProfile(profile);
+    }
   },
   updateRun: (updatedRun: RunHistory) => {
     const runs = storageService.getRuns();
     const updated = runs.map(r => r.id === updatedRun.id ? updatedRun : r);
     localStorage.setItem(KEYS.RUNS, JSON.stringify(updated));
   },
-  getProfile: (): UserProfile => {
-    const data = localStorage.getItem(KEYS.PROFILE);
-    const stored = data ? JSON.parse(data) : INITIAL_PROFILE;
-    if (!stored.joinedClubIds) stored.joinedClubIds = [];
-    if (!stored.friendIds) stored.friendIds = INITIAL_PROFILE.friendIds;
-    if (!stored.theme) stored.theme = 'barista';
-    if (!stored.unitSystem) stored.unitSystem = 'metric';
-    if (stored.isSetup === undefined) stored.isSetup = false;
-    return stored;
+  
+  // SESSION & USER MANAGEMENT
+  getActiveSession: (): string | null => {
+    // Check localStorage first (persistent session)
+    let id = localStorage.getItem(KEYS.ACTIVE_SESSION);
+    if (!id) {
+      // Check sessionStorage (temporary session)
+      id = sessionStorage.getItem(KEYS.ACTIVE_SESSION);
+    }
+    return id;
   },
-  saveProfile: (profile: UserProfile) => {
-    localStorage.setItem(KEYS.PROFILE, JSON.stringify(profile));
+  setActiveSession: (userId: string | null, remember: boolean = true) => {
+    if (userId) {
+      if (remember) {
+        localStorage.setItem(KEYS.ACTIVE_SESSION, userId);
+        localStorage.setItem(KEYS.REMEMBER_ME, 'true');
+      } else {
+        sessionStorage.setItem(KEYS.ACTIVE_SESSION, userId);
+        localStorage.removeItem(KEYS.REMEMBER_ME);
+      }
+    } else {
+      localStorage.removeItem(KEYS.ACTIVE_SESSION);
+      sessionStorage.removeItem(KEYS.ACTIVE_SESSION);
+      localStorage.removeItem(KEYS.REMEMBER_ME);
+    }
   },
   getAllUsers: (): UserProfile[] => {
     const data = localStorage.getItem(KEYS.USERS);
-    return data ? JSON.parse(data) : DISCOVERY_USERS;
+    const users = data ? JSON.parse(data) : MOCK_USERS;
+    return users;
   },
+  getProfile: (): UserProfile | null => {
+    const activeId = storageService.getActiveSession();
+    if (!activeId) return null;
+    const users = storageService.getAllUsers();
+    return users.find(u => u.id === activeId) || null;
+  },
+  saveProfile: (profile: UserProfile) => {
+    const users = storageService.getAllUsers();
+    const existingIndex = users.findIndex(u => u.id === profile.id);
+    let updatedUsers;
+    if (existingIndex > -1) {
+      updatedUsers = [...users];
+      updatedUsers[existingIndex] = profile;
+    } else {
+      updatedUsers = [profile, ...users];
+    }
+    localStorage.setItem(KEYS.USERS, JSON.stringify(updatedUsers));
+  },
+
+  getCredentials: (): Record<string, string> => {
+    const data = localStorage.getItem(KEYS.CREDENTIALS);
+    return data ? JSON.parse(data) : {};
+  },
+  saveCredential: (userId: string, hash: string) => {
+    const creds = storageService.getCredentials();
+    creds[userId] = hash;
+    localStorage.setItem(KEYS.CREDENTIALS, JSON.stringify(creds));
+  },
+
+  login: async (username: string, password: string, remember: boolean = true): Promise<UserProfile | null> => {
+    const users = storageService.getAllUsers();
+    const user = users.find(u => u.username.toLowerCase() === username.toLowerCase());
+    if (user) {
+      const creds = storageService.getCredentials();
+      const storedHash = creds[user.id];
+      if (!storedHash) {
+        storageService.setActiveSession(user.id, remember);
+        return user;
+      }
+      const inputHash = await hashPassword(password);
+      if (inputHash === storedHash) {
+        storageService.setActiveSession(user.id, remember);
+        return user;
+      }
+    }
+    return null;
+  },
+
+  signup: async (username: string, password: string, remember: boolean = true): Promise<UserProfile | null> => {
+    const users = storageService.getAllUsers();
+    const exists = users.find(u => u.username.toLowerCase() === username.toLowerCase());
+    if (exists) return null;
+
+    const userId = Math.random().toString(36).substr(2, 9);
+    const hashedPassword = await hashPassword(password);
+
+    const newUser: UserProfile = {
+      id: userId,
+      username,
+      avatar: DEFAULT_AVATAR,
+      bio: '',
+      joinedClubIds: [],
+      friendIds: [],
+      isSetup: false,
+      unitSystem: 'imperial',
+      stats: { totalDistance: 0, totalRuns: 0, avgPace: '0:00' }
+    };
+
+    storageService.saveProfile(newUser);
+    storageService.saveCredential(userId, hashedPassword);
+    storageService.setActiveSession(newUser.id, remember);
+    return newUser;
+  },
+
+  logout: () => {
+    storageService.setActiveSession(null);
+  },
+
   toggleFollowUser: (targetUserId: string) => {
     const profile = storageService.getProfile();
+    if (!profile) return null;
     const index = profile.friendIds.indexOf(targetUserId);
     if (index > -1) {
       profile.friendIds.splice(index, 1);
@@ -137,6 +216,7 @@ export const storageService = {
   },
   toggleClubMembership: (clubId: string) => {
     const profile = storageService.getProfile();
+    if (!profile) return null;
     const index = profile.joinedClubIds.indexOf(clubId);
     if (index > -1) {
       profile.joinedClubIds.splice(index, 1);

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { AppTab, Route, RunHistory, UserProfile, Difficulty, ThemeType, RunClub, Review, UnitSystem } from './types';
 import { storageService } from './services/storageService';
@@ -11,13 +12,17 @@ import ClubCreator from './components/ClubCreator';
 import ReviewModal from './components/ReviewModal';
 import Onboarding from './components/Onboarding';
 import FriendsList from './components/FriendsList';
+import Login from './components/Login';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<AppTab>('explore');
   const [routes, setRoutes] = useState<Route[]>([]);
   const [clubs, setClubs] = useState<RunClub[]>([]);
   const [runs, setRuns] = useState<RunHistory[]>([]);
-  const [profile, setProfile] = useState<UserProfile | null>(null);
+  
+  // Synchronous initial state for auto-login
+  const [profile, setProfile] = useState<UserProfile | null>(() => storageService.getProfile());
+  
   const [selectedRoute, setSelectedRoute] = useState<Route | null>(null);
   const [trackingRoute, setTrackingRoute] = useState<Route | null>(null);
   const [editingRoute, setEditingRoute] = useState<Route | null>(null);
@@ -25,8 +30,11 @@ const App: React.FC = () => {
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [pendingReviewRoute, setPendingReviewRoute] = useState<Route | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [theme, setTheme] = useState<ThemeType>('barista');
-  const [unitSystem, setUnitSystem] = useState<UnitSystem>('metric');
+  
+  // Dynamic theme & unit system based on profile
+  const [theme, setTheme] = useState<ThemeType>(profile?.theme || 'barista');
+  const [unitSystem, setUnitSystem] = useState<UnitSystem>(profile?.unitSystem || 'imperial');
+  
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [offlineRouteIds, setOfflineRouteIds] = useState<Set<string>>(new Set());
 
@@ -41,14 +49,16 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    // Already handled profile in initial state, but ensure settings are in sync if profile changes
+    if (profile) {
+      if (profile.theme) setTheme(profile.theme);
+      if (profile.unitSystem) setUnitSystem(profile.unitSystem);
+    }
+    
     const loadedRoutes = storageService.getRoutes();
     setRoutes(loadedRoutes);
     setClubs(storageService.getClubs());
     setRuns(storageService.getRuns());
-    const p = storageService.getProfile();
-    setProfile(p);
-    if (p.theme) setTheme(p.theme);
-    if (p.unitSystem) setUnitSystem(p.unitSystem);
 
     checkOfflineRoutes();
 
@@ -59,11 +69,10 @@ const App: React.FC = () => {
       const route = loadedRoutes.find(r => r.id === routeId);
       if (route) {
         setSelectedRoute(route);
-        // Clear param without refreshing
         window.history.replaceState({}, document.title, window.location.pathname);
       }
     }
-  }, []);
+  }, [profile?.id]);
 
   const checkOfflineRoutes = async () => {
     const offRoutes = await offlineService.getOfflineRoutes();
@@ -112,14 +121,8 @@ const App: React.FC = () => {
     storageService.saveClub(club);
     setClubs([club, ...clubs]);
     const updatedProfile = storageService.toggleClubMembership(club.id);
-    setProfile(updatedProfile);
+    if (updatedProfile) setProfile(updatedProfile);
     setIsAddingClub(false);
-  };
-
-  const toggleJoinClub = (e: React.MouseEvent, clubId: string) => {
-    e.stopPropagation();
-    const updatedProfile = storageService.toggleClubMembership(clubId);
-    setProfile(updatedProfile);
   };
 
   const handleReviewSubmitted = (review: Review) => {
@@ -151,6 +154,11 @@ const App: React.FC = () => {
     if (route) setPendingReviewRoute(route);
   };
 
+  const handleLogout = () => {
+    storageService.logout();
+    setProfile(null);
+  };
+
   const filteredRoutes = routes.filter(r => 
     r.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     r.tags.some(t => t.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -163,6 +171,10 @@ const App: React.FC = () => {
     { id: 'neon', label: 'Neon Night', colors: ['#000000', '#d946ef', '#22d3ee'] },
     { id: 'forest', label: 'Forest Trail', colors: ['#050a06', '#a3e635', '#fbbf24'] },
   ];
+
+  if (!profile) {
+    return <Login onLogin={setProfile} />;
+  }
 
   if (profile && !profile.isSetup) {
     return <Onboarding onComplete={setProfile} />;
@@ -408,6 +420,15 @@ const App: React.FC = () => {
                 ))}
               </div>
             </section>
+
+            <div className="pt-10">
+              <button 
+                onClick={handleLogout}
+                className="w-full py-6 rounded-[2rem] border border-red-500/20 text-red-500 text-xs font-black uppercase tracking-[0.4em] hover:bg-red-500/10 transition-all"
+              >
+                Close the Tab (Logout)
+              </button>
+            </div>
           </div>
         )}
       </main>
@@ -459,7 +480,7 @@ const App: React.FC = () => {
         />
       )}
 
-      {isEditingProfile && (
+      {isEditingProfile && profile && (
         <Onboarding onComplete={(p) => {
           setProfile(p);
           setIsEditingProfile(false);
