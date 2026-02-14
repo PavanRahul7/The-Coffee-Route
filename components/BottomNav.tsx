@@ -8,62 +8,75 @@ interface BottomNavProps {
 }
 
 const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onTabChange }) => {
-  const tabs: { id: AppTab; label: string; icon: React.ReactNode }[] = [
+  const tabs: { id: AppTab; label: string; icon: (active: boolean) => React.ReactNode }[] = [
     { 
       id: 'explore', 
-      label: 'Explore', 
-      icon: (
+      label: 'Feed', 
+      icon: (active) => (
         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
         </svg>
       ) 
     },
     { 
       id: 'create', 
-      label: 'Create', 
-      icon: (
+      label: 'Draw', 
+      icon: (active) => (
         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
         </svg>
       ) 
     },
     { 
       id: 'runs', 
-      label: 'My Runs', 
-      icon: (
+      label: 'Runs', 
+      icon: (active) => (
         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
         </svg>
       ) 
     },
     { 
       id: 'profile', 
-      label: 'Profile', 
-      icon: (
+      label: 'You', 
+      icon: (active) => (
         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
         </svg>
       ) 
     },
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-slate-900/80 backdrop-blur-lg border-t border-slate-800 z-50">
-      <div className="flex justify-around items-center h-16 max-w-lg mx-auto">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => onTabChange(tab.id)}
-            className={`flex flex-col items-center justify-center w-full transition-colors ${
-              activeTab === tab.id ? 'text-blue-400' : 'text-slate-400'
-            }`}
-          >
-            {tab.icon}
-            <span className="text-[10px] mt-1 font-medium">{tab.label}</span>
-          </button>
-        ))}
-      </div>
-    </nav>
+    <div className="fixed bottom-10 left-0 right-0 z-50 px-6 flex justify-center pointer-events-none">
+      <nav className="glass max-w-lg w-full rounded-[2.5rem] px-4 py-3 flex justify-around items-center pointer-events-auto shadow-2xl">
+        {tabs.map((tab) => {
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => onTabChange(tab.id)}
+              className={`relative flex flex-col items-center justify-center py-2 px-6 rounded-3xl transition-all duration-300 btn-active ${
+                isActive ? 'scale-110' : 'opacity-40 hover:opacity-100'
+              }`}
+            >
+              <div 
+                className="transition-colors duration-300"
+                style={{ color: isActive ? 'var(--accent-primary)' : 'var(--text-main)' }}
+              >
+                {tab.icon(isActive)}
+              </div>
+              <span className={`text-[9px] mt-1 font-extrabold uppercase tracking-widest transition-opacity duration-300 ${isActive ? 'opacity-100' : 'opacity-0'}`}>
+                {tab.label}
+              </span>
+              {isActive && (
+                <div className="absolute -bottom-1 w-1 h-1 rounded-full bg-[var(--accent-primary)] shadow-[0_0_10px_#3b82f6]" />
+              )}
+            </button>
+          );
+        })}
+      </nav>
+    </div>
   );
 };
 

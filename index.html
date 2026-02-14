@@ -1,69 +1,126 @@
-
 <!DOCTYPE html>
 <html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Velocity Run Tracker</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>ROUTE UP | High Performance Run Tracker</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
-      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Orbitron:wght@700&display=swap');
+      @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Bebas+Neue&display=swap');
       
+      :root {
+        --bg-color: #05070a;
+        --card-bg: rgba(18, 22, 28, 0.7);
+        --accent-primary: #3b82f6;
+        --accent-secondary: #10b981;
+        --text-main: #f8fafc;
+        --text-muted: #94a3b8;
+        --border-color: rgba(255, 255, 255, 0.08);
+        --glass-bg: rgba(10, 14, 20, 0.85);
+        --safe-top: env(safe-area-inset-top);
+        --safe-bottom: env(safe-area-inset-bottom);
+      }
+
+      .theme-solar {
+        --bg-color: #f8fafc;
+        --card-bg: rgba(255, 255, 255, 0.9);
+        --accent-primary: #f97316;
+        --accent-secondary: #0f172a;
+        --text-main: #0f172a;
+        --text-muted: #64748b;
+        --border-color: rgba(0, 0, 0, 0.05);
+        --glass-bg: rgba(241, 245, 249, 0.9);
+      }
+
+      .theme-neon {
+        --bg-color: #000;
+        --card-bg: rgba(20, 20, 20, 0.6);
+        --accent-primary: #d946ef;
+        --accent-secondary: #22d3ee;
+        --text-main: #fff;
+        --text-muted: #a1a1aa;
+        --border-color: rgba(217, 70, 239, 0.15);
+        --glass-bg: rgba(0, 0, 0, 0.85);
+      }
+
+      .theme-forest {
+        --bg-color: #0a0f0b;
+        --card-bg: rgba(16, 24, 18, 0.7);
+        --accent-primary: #a3e635;
+        --accent-secondary: #fcd34d;
+        --text-main: #f7fee7;
+        --text-muted: #4d7c0f;
+        --border-color: rgba(163, 230, 53, 0.1);
+        --glass-bg: rgba(10, 15, 11, 0.9);
+      }
+
       html, body, #root {
         height: 100%;
         margin: 0;
         padding: 0;
+        background-color: var(--bg-color);
+        color: var(--text-main);
+        transition: background-color 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        overscroll-behavior: none;
       }
 
       body {
-        font-family: 'Inter', sans-serif;
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        -webkit-font-smoothing: antialiased;
       }
+
       .font-display {
-        font-family: 'Orbitron', sans-serif;
+        font-family: 'Bebas Neue', cursive;
+        letter-spacing: 0.05em;
       }
       
-      /* Smooth transitions */
-      .page-transition-enter {
-        opacity: 0;
-        transform: translateY(10px);
-      }
-      .page-transition-enter-active {
-        opacity: 1;
-        transform: translateY(0);
-        transition: opacity 300ms, transform 300ms;
+      .glass {
+        background: var(--glass-bg);
+        backdrop-filter: blur(32px) saturate(180%);
+        -webkit-backdrop-filter: blur(32px) saturate(180%);
+        border: 1px solid var(--border-color);
       }
 
-      /* Dark mode overrides for common components */
-      ::-webkit-scrollbar {
-        width: 6px;
-      }
-      ::-webkit-scrollbar-track {
-        background: #0f172a;
-      }
-      ::-webkit-scrollbar-thumb {
-        background: #334155;
-        border-radius: 3px;
-      }
-
-      /* Leaflet Customizations */
-      .leaflet-container {
-        background: #0f172a !important; /* Slightly lighter background to distinguish from app bg */
-        width: 100%;
-        height: 100%;
-      }
-      .leaflet-vignette {
-        box-shadow: inset 0 0 100px rgba(0,0,0,0.5);
-        pointer-events: none;
-      }
       .route-glow {
-        filter: drop-shadow(0 0 5px #3b82f6);
+        filter: drop-shadow(0 0 8px var(--accent-primary));
       }
-      /* Ensure markers are visible */
-      .custom-div-icon {
-        background: transparent;
-        border: none;
+
+      .leaflet-container {
+        background: var(--bg-color) !important;
+        filter: grayscale(0.1) contrast(1.1) brightness(0.9);
+      }
+
+      /* Hide scrollbar but allow scrolling */
+      ::-webkit-scrollbar { display: none; }
+      * { -ms-overflow-style: none; scrollbar-width: none; }
+
+      .card-shadow {
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+      }
+
+      .btn-active:active {
+        transform: scale(0.95);
+      }
+
+      @keyframes fadeSlideUp {
+        from { opacity: 0; transform: translateY(30px) scale(0.98); }
+        to { opacity: 1; transform: translateY(0) scale(1); }
+      }
+
+      .fade-slide-up {
+        animation: fadeSlideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      }
+
+      @keyframes countdown {
+        0% { transform: scale(1.5); opacity: 0; }
+        50% { transform: scale(1); opacity: 1; }
+        100% { transform: scale(0.5); opacity: 0; }
+      }
+
+      .animate-countdown {
+        animation: countdown 1s ease-in-out infinite;
       }
     </style>
 <script type="importmap">
@@ -78,7 +135,7 @@
 }
 </script>
 </head>
-<body class="bg-slate-950 text-slate-50 overflow-hidden">
+<body class="selection:bg-blue-500/30">
     <div id="root"></div>
 </body>
 </html>

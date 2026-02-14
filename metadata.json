@@ -1,5 +1,5 @@
 {
-  "name": "Velocity - Run Social & Track",
+  "name": "ROUTE UP - Run Social & Track",
   "description": "A high-performance running app to create routes, discover new paths, and track your runs live with AI coaching and community sharing.",
   "requestFramePermissions": [
     "geolocation"

@@ -10,6 +10,8 @@ export enum Difficulty {
   HARD = 'Hard'
 }
 
+export type ThemeType = 'stealth' | 'solar' | 'neon' | 'forest';
+
 export interface Route {
   id: string;
   name: string;
@@ -42,6 +44,7 @@ export interface UserProfile {
   username: string;
   avatar: string;
   bio: string;
+  theme?: ThemeType;
   stats: {
     totalDistance: number;
     totalRuns: number;

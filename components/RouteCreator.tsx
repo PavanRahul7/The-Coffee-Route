@@ -3,7 +3,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { LatLng, Route, Difficulty } from '../types';
 import { geminiService } from '../services/geminiService';
 
-// Leaflet is global from script tag
 declare var L: any;
 
 interface RouteSegment {
@@ -27,17 +26,12 @@ const RouteCreator: React.FC<RouteCreatorProps> = ({ onSave, onCancel, initialRo
   const [description, setDescription] = useState(initialRoute?.description || '');
   const [difficulty, setDifficulty] = useState<Difficulty>(initialRoute?.difficulty || Difficulty.EASY);
   const [tags, setTags] = useState<string[]>(initialRoute?.tags || []);
-  const [tagInput, setTagInput] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
   
   const [isSaving, setIsSaving] = useState(false);
   const [isSnapping, setIsSnapping] = useState(false);
-  const [showFullForm, setShowFullForm] = useState(false);
-  const [mapReady, setMapReady] = useState(false);
-
-  // Context Menu State (Footpath style)
   const [contextMenu, setContextMenu] = useState<{ x: number, y: number, latlng: LatLng } | null>(null);
-  const [locationSearch, setLocationSearch] = useState('');
-  const [isGeocoding, setIsGeocoding] = useState(false);
   
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<any>(null);
@@ -48,6 +42,7 @@ const RouteCreator: React.FC<RouteCreatorProps> = ({ onSave, onCancel, initialRo
 
   useEffect(() => {
     let timeout: number;
+    const accentColor = getComputedStyle(document.documentElement).getPropertyValue('--accent-primary').trim() || '#3b82f6';
     
     const initMap = () => {
       if (typeof L === 'undefined') {
@@ -64,13 +59,12 @@ const RouteCreator: React.FC<RouteCreatorProps> = ({ onSave, onCancel, initialRo
           fadeAnimation: true,
         }).setView([center.lat, center.lng], 15);
 
-        // Footpath uses a very clean tile set, we'll use Carto Voyager/Dark depending on theme
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
           maxZoom: 20
         }).addTo(mapInstance.current);
 
         polylineRef.current = L.polyline([], {
-          color: '#3b82f6',
+          color: accentColor,
           weight: 6,
           opacity: 0.9,
           className: 'route-glow'
@@ -81,18 +75,6 @@ const RouteCreator: React.FC<RouteCreatorProps> = ({ onSave, onCancel, initialRo
         mapInstance.current.on('contextmenu', (e: any) => {
           const point = mapInstance.current.latLngToContainerPoint(e.latlng);
           setContextMenu({ x: point.x, y: point.y, latlng: e.latlng });
-        });
-
-        // Long press support for mobile
-        let pressTimer: any;
-        mapInstance.current.on('mousedown touchstart', (e: any) => {
-          pressTimer = window.setTimeout(() => {
-            const point = mapInstance.current.latLngToContainerPoint(e.latlng);
-            setContextMenu({ x: point.x, y: point.y, latlng: e.latlng });
-          }, 600);
-        });
-        mapInstance.current.on('mouseup touchend mousemove touchmove', () => {
-          clearTimeout(pressTimer);
         });
 
         if (initialRoute?.path) {
@@ -109,7 +91,6 @@ const RouteCreator: React.FC<RouteCreatorProps> = ({ onSave, onCancel, initialRo
 
         window.setTimeout(() => {
           mapInstance.current.invalidateSize();
-          setMapReady(true);
         }, 300);
       }
     };
@@ -125,6 +106,17 @@ const RouteCreator: React.FC<RouteCreatorProps> = ({ onSave, onCancel, initialRo
     };
   }, []);
 
+  const handleLocationSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!searchQuery.trim() || !mapInstance.current) return;
+    setIsSearching(true);
+    const coords = await geminiService.geocodeLocation(searchQuery);
+    if (coords) {
+      mapInstance.current.setView([coords.lat, coords.lng], 15, { animate: true });
+    }
+    setIsSearching(false);
+  };
+
   const fetchRouteSegment = async (start: LatLng, end: LatLng): Promise<LatLng[]> => {
     try {
       const url = `https://router.project-osrm.org/route/v1/walking/${start.lng},${start.lat};${end.lng},${end.lat}?overview=full&geometries=geojson`;
@@ -136,9 +128,7 @@ const RouteCreator: React.FC<RouteCreatorProps> = ({ onSave, onCancel, initialRo
           lng: coord[0]
         }));
       }
-    } catch (err) {
-      console.error('Routing error:', err);
-    }
+    } catch (err) { console.error(err); }
     return [end];
   };
 
@@ -150,7 +140,6 @@ const RouteCreator: React.FC<RouteCreatorProps> = ({ onSave, onCancel, initialRo
       setIsSnapping(true);
       const lastSegment = segments[segments.length - 1];
       const lastPoint = lastSegment.pathPoints[lastSegment.pathPoints.length - 1];
-      
       const snappedPoints = await fetchRouteSegment(lastPoint, newClickPoint);
       
       const newSegment: RouteSegment = {
@@ -184,48 +173,36 @@ const RouteCreator: React.FC<RouteCreatorProps> = ({ onSave, onCancel, initialRo
 
   const updateMarkers = (currentPath: LatLng[], waypoints: LatLng[]) => {
     if (!mapInstance.current || typeof L === 'undefined') return;
-
     waypointMarkersRef.current.forEach(m => m.remove());
     waypointMarkersRef.current = [];
 
-    const startIcon = L.divIcon({
-      className: 'custom-div-icon',
-      html: `<div style="background-color: #10b981; width: 14px; height: 14px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 15px rgba(16, 185, 129, 0.6);"></div>`,
-      iconSize: [14, 14],
-      iconAnchor: [7, 7]
-    });
+    const accentSec = getComputedStyle(document.documentElement).getPropertyValue('--accent-secondary').trim() || '#10b981';
+    const accentPri = getComputedStyle(document.documentElement).getPropertyValue('--accent-primary').trim() || '#3b82f6';
 
-    const waypointIcon = L.divIcon({
+    const createIcon = (color: string, size: number) => L.divIcon({
       className: 'custom-div-icon',
-      html: `<div style="background-color: #fff; width: 10px; height: 10px; border-radius: 50%; border: 2px solid #3b82f6; box-shadow: 0 0 10px rgba(59, 130, 246, 0.4);"></div>`,
-      iconSize: [10, 10],
-      iconAnchor: [5, 5]
-    });
-
-    const endIcon = L.divIcon({
-      className: 'custom-div-icon',
-      html: `<div style="background-color: #3b82f6; width: 14px; height: 14px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 15px rgba(59, 130, 246, 0.6);"></div>`,
-      iconSize: [14, 14],
-      iconAnchor: [7, 7]
+      html: `<div style="background-color: ${color}; width: ${size}px; height: ${size}px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 15px ${color}80;"></div>`,
+      iconSize: [size, size],
+      iconAnchor: [size/2, size/2]
     });
 
     if (currentPath.length > 0) {
       if (!startMarkerRef.current) {
-        startMarkerRef.current = L.marker([currentPath[0].lat, currentPath[0].lng], { icon: startIcon, zIndexOffset: 1000 }).addTo(mapInstance.current);
+        startMarkerRef.current = L.marker([currentPath[0].lat, currentPath[0].lng], { icon: createIcon(accentSec, 16), zIndexOffset: 1000 }).addTo(mapInstance.current);
       } else {
         startMarkerRef.current.setLatLng([currentPath[0].lat, currentPath[0].lng]);
       }
 
       waypoints.forEach((wp, idx) => {
-        if (idx === 0) return; // Skip start
-        if (idx === waypoints.length - 1 && currentPath.length > 1) return; // Skip end
-        const marker = L.marker([wp.lat, wp.lng], { icon: waypointIcon }).addTo(mapInstance.current);
+        if (idx === 0) return; 
+        if (idx === waypoints.length - 1 && currentPath.length > 1) return;
+        const marker = L.marker([wp.lat, wp.lng], { icon: createIcon('#fff', 10) }).addTo(mapInstance.current);
         waypointMarkersRef.current.push(marker);
       });
 
       if (currentPath.length > 1) {
         if (!endMarkerRef.current) {
-          endMarkerRef.current = L.marker([currentPath[currentPath.length - 1].lat, currentPath[currentPath.length - 1].lng], { icon: endIcon, zIndexOffset: 1001 }).addTo(mapInstance.current);
+          endMarkerRef.current = L.marker([currentPath[currentPath.length - 1].lat, currentPath[currentPath.length - 1].lng], { icon: createIcon(accentPri, 16), zIndexOffset: 1001 }).addTo(mapInstance.current);
         } else {
           endMarkerRef.current.setLatLng([currentPath[currentPath.length - 1].lat, currentPath[currentPath.length - 1].lng]);
         }
@@ -240,31 +217,11 @@ const RouteCreator: React.FC<RouteCreatorProps> = ({ onSave, onCancel, initialRo
     }
     let total = 0;
     for (let i = 0; i < p.length - 1; i++) {
-      const p1 = L.latLng(p[i].lat, p[i].lng);
-      const p2 = L.latLng(p[i + 1].lat, p[i + 1].lng);
-      total += p1.distanceTo(p2);
+      total += L.latLng(p[i].lat, p[i].lng).distanceTo(L.latLng(p[i+1].lat, p[i+1].lng));
     }
     setDistance(total / 1000);
   };
 
-  const handleLoop = async () => {
-    if (segments.length < 2) return;
-    handleAddPoint(segments[0].pathPoints[0], true);
-  };
-
-  const handleClear = () => {
-    setSegments([]);
-    setDistance(0);
-    polylineRef.current.setLatLngs([]);
-    if (startMarkerRef.current) startMarkerRef.current.remove();
-    if (endMarkerRef.current) endMarkerRef.current.remove();
-    waypointMarkersRef.current.forEach(m => m.remove());
-    startMarkerRef.current = null;
-    endMarkerRef.current = null;
-    waypointMarkersRef.current = [];
-  };
-
-  // Fix: Added handleUndo function to revert the last added segment from the route
   const handleUndo = () => {
     if (segments.length === 0) return;
     setSegments(prev => {
@@ -278,14 +235,28 @@ const RouteCreator: React.FC<RouteCreatorProps> = ({ onSave, onCancel, initialRo
     });
   };
 
-  // Fix: Added handleSave function to submit the route and generate an AI description if missing
+  // Implemented missing handleClear function
+  const handleClear = () => {
+    setSegments([]);
+    if (polylineRef.current) polylineRef.current.setLatLngs([]);
+    if (startMarkerRef.current) {
+      startMarkerRef.current.remove();
+      startMarkerRef.current = null;
+    }
+    if (endMarkerRef.current) {
+      endMarkerRef.current.remove();
+      endMarkerRef.current = null;
+    }
+    updateMarkers([], []);
+    setDistance(0);
+  };
+
   const handleSave = async () => {
     if (!name || distance === 0) return;
     setIsSaving(true);
     let finalDescription = description;
     if (!finalDescription) {
-      const elevation = Math.round(distance * 15);
-      finalDescription = await geminiService.generateRouteDescription(name, parseFloat(distance.toFixed(1)), elevation, tags);
+      finalDescription = await geminiService.generateRouteDescription(name, parseFloat(distance.toFixed(1)), Math.round(distance * 15), tags);
     }
     const newRoute: Route = {
       id: initialRoute?.id || Math.random().toString(36).substr(2, 9),
@@ -306,107 +277,82 @@ const RouteCreator: React.FC<RouteCreatorProps> = ({ onSave, onCancel, initialRo
   };
 
   return (
-    <div className="fixed inset-0 z-[110] bg-slate-950 flex flex-col overflow-hidden animate-in fade-in">
+    <div className="fixed inset-0 z-[110] app-bg flex flex-col overflow-hidden animate-in fade-in transition-colors duration-500">
       <div className="relative flex-1 bg-slate-900">
         <div ref={mapRef} className="w-full h-full" />
         
-        {/* Footpath Style Context Menu */}
+        {/* Context Menu */}
         {contextMenu && (
           <div 
-            className="absolute z-[2000] bg-white rounded-xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-100 py-1"
+            className="absolute z-[2000] bg-white rounded-[1.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150 py-2 border border-black/5"
             style={{ 
-              left: `${Math.min(contextMenu.x, window.innerWidth - 200)}px`, 
+              left: `${Math.min(contextMenu.x, window.innerWidth - 220)}px`, 
               top: `${Math.min(contextMenu.y, window.innerHeight - 200)}px`,
-              minWidth: '200px'
+              minWidth: '220px'
             }}
           >
-            <button 
-              onClick={() => handleAddPoint(contextMenu.latlng)}
-              className="w-full text-left px-5 py-3.5 text-slate-800 text-sm font-medium hover:bg-slate-50 transition-colors flex items-center gap-3 border-b border-slate-100"
-            >
-              Route to here
+            <button onClick={() => handleAddPoint(contextMenu.latlng)} className="w-full text-left px-6 py-4 text-slate-900 text-sm font-bold hover:bg-slate-50 transition-colors flex items-center gap-4">
+               <div className="w-2 h-2 rounded-full bg-blue-500"></div> Route Here
             </button>
-            <button 
-              onClick={() => handleAddPoint(contextMenu.latlng, true)}
-              className="w-full text-left px-5 py-3.5 text-slate-800 text-sm font-medium hover:bg-slate-50 transition-colors flex items-center gap-3 border-b border-slate-100"
-            >
-              Add waypoint
-            </button>
-            <button className="w-full text-left px-5 py-3.5 text-slate-400 text-sm font-medium flex items-center justify-between gap-3 group">
-              <span className="flex items-center gap-3">Save to favorites</span>
-              <span className="text-[9px] bg-blue-600 text-white px-2 py-0.5 rounded-md font-bold uppercase tracking-wider">Elite</span>
+            <button onClick={() => handleAddPoint(contextMenu.latlng, true)} className="w-full text-left px-6 py-4 text-slate-900 text-sm font-bold hover:bg-slate-50 transition-colors flex items-center gap-4 border-t border-slate-100">
+               <div className="w-2 h-2 rounded-full border-2 border-blue-500"></div> Waypoint
             </button>
           </div>
         )}
 
-        {/* HUD Overlay - Top Left */}
-        <div className="absolute top-6 left-6 z-[1000] flex gap-3 items-center">
-          <button onClick={onCancel} className="bg-slate-900/90 backdrop-blur-md p-4 rounded-2xl text-white shadow-2xl border border-slate-700/50 active:scale-95 transition-all">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
-          <div className="bg-slate-900/90 backdrop-blur-md px-6 py-4 rounded-2xl border border-slate-700/50 shadow-2xl min-w-[200px]">
-            <span className="text-[10px] text-blue-400 font-bold uppercase tracking-widest font-display block mb-1">ROUTING</span>
-            <input 
-              value={name}
-              onChange={e => setName(e.target.value)}
-              placeholder="Adventure Name..."
-              className="bg-transparent text-white font-bold text-lg focus:outline-none w-full placeholder:text-slate-600"
-            />
+        {/* HUD Overlay - Top */}
+        <div className="absolute top-12 left-8 right-8 z-[1000] flex flex-col gap-4">
+          <div className="flex gap-4">
+            <button onClick={onCancel} className="glass p-5 rounded-3xl text-[var(--text-main)] shadow-2xl active:scale-90 transition-all">
+              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 19l-7-7 7-7" /></svg>
+            </button>
+            <form onSubmit={handleLocationSearch} className="flex-1 relative group">
+              <input 
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Jump to location..."
+                className="w-full glass px-14 py-5 rounded-3xl text-[var(--text-main)] font-bold placeholder:text-white/20 focus:outline-none focus:ring-2 ring-[var(--accent-primary)]/30 transition-all"
+              />
+              <svg className="absolute left-6 top-1/2 -translate-y-1/2 h-5 w-5 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+              {isSearching && <div className="absolute right-6 top-1/2 -translate-y-1/2 animate-spin h-5 w-5 border-2 border-[var(--accent-primary)] border-t-transparent rounded-full"></div>}
+            </form>
+          </div>
+
+          <div className="glass px-8 py-4 rounded-[2rem] flex items-center gap-4 animate-in slide-in-from-top-4 duration-500">
+            <span className="text-[10px] font-black uppercase tracking-[0.3em] opacity-40">Name</span>
+            <input value={name} onChange={e => setName(e.target.value)} placeholder="Route Name..." className="bg-transparent text-lg font-bold text-white focus:outline-none flex-1 placeholder:text-white/10" />
           </div>
         </div>
 
-        {/* Toolbelt - Right Side */}
-        <div className="absolute top-24 right-6 flex flex-col gap-3 z-[1000]">
-           <button 
-            onClick={handleLoop}
-            disabled={segments.length < 2}
-            className="bg-slate-900/95 backdrop-blur-md p-4 rounded-2xl text-blue-400 shadow-2xl border border-slate-700/50 disabled:opacity-20 active:scale-95 transition-all"
-            title="Loop"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-          </button>
-           <button 
-            onClick={() => handleUndo()}
-            disabled={segments.length === 0}
-            className="bg-slate-900/95 backdrop-blur-md p-4 rounded-2xl text-white shadow-2xl border border-slate-700/50 disabled:opacity-20 active:scale-95 transition-all"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-            </svg>
-          </button>
-          <button 
-            onClick={handleClear}
-            className="bg-slate-900/95 backdrop-blur-md p-4 rounded-2xl text-red-400 shadow-2xl border border-slate-700/50 active:scale-95 transition-all"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-            </svg>
-          </button>
+        {/* Sidebar Controls */}
+        <div className="absolute top-64 right-8 flex flex-col gap-4 z-[1000]">
+           <button onClick={() => handleUndo()} disabled={segments.length === 0} className="glass p-5 rounded-3xl text-white shadow-2xl disabled:opacity-20 active:scale-95 transition-all">
+             <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" /></svg>
+           </button>
+           <button onClick={handleClear} className="glass p-5 rounded-3xl text-red-400 shadow-2xl active:scale-95 transition-all">
+             <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+           </button>
         </div>
 
-        {/* Summary Bottom Bar */}
-        <div className="absolute bottom-6 left-6 right-6 z-[1000] bg-slate-900/95 backdrop-blur-xl p-8 rounded-[3rem] border border-slate-800 shadow-2xl">
+        {/* Footer Dashboard */}
+        <div className="absolute bottom-12 left-8 right-8 z-[1000] glass p-10 rounded-[3.5rem] shadow-2xl">
           <div className="flex justify-between items-center">
-            <div className="flex gap-10">
-              <div>
-                <span className="text-[10px] uppercase font-bold text-slate-500 tracking-widest font-display">Distance</span>
-                <div className="text-4xl font-display text-white mt-1">{distance.toFixed(2)} <span className="text-base text-slate-600">km</span></div>
+            <div className="flex gap-16">
+              <div className="space-y-1">
+                <span className="text-[10px] font-black uppercase tracking-[0.4em] opacity-30 font-display">Distance</span>
+                <div className="text-5xl font-display text-white">{distance.toFixed(2)} <span className="text-sm opacity-20">km</span></div>
               </div>
-              <div>
-                <span className="text-[10px] uppercase font-bold text-slate-500 tracking-widest font-display">Elevation</span>
-                <div className="text-4xl font-display text-emerald-400 mt-1">+{Math.round(distance * 15)} <span className="text-base text-slate-600">m</span></div>
+              <div className="space-y-1">
+                <span className="text-[10px] font-black uppercase tracking-[0.4em] opacity-30 font-display">Climb</span>
+                <div className="text-5xl font-display text-[var(--accent-secondary)]">+{Math.round(distance * 15)} <span className="text-sm opacity-20">m</span></div>
               </div>
             </div>
             <button 
               disabled={distance === 0 || !name || isSaving}
               onClick={handleSave}
-              className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-5 px-10 rounded-2xl shadow-xl shadow-blue-900/40 transition-all flex items-center gap-3 active:scale-[0.98] font-display uppercase tracking-widest"
+              className="bg-[var(--accent-primary)] text-white font-black py-6 px-12 rounded-3xl shadow-2xl shadow-[var(--accent-primary)]/40 transition-all flex items-center gap-4 active:scale-95 font-display text-2xl tracking-widest disabled:opacity-20"
             >
-              {isSaving ? 'Saving...' : 'Save Route'}
+              {isSaving ? 'UPLOADING...' : 'SAVE TRACK'}
             </button>
           </div>
         </div>

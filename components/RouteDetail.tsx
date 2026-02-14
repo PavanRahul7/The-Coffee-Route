@@ -1,6 +1,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Route } from '../types';
+// Added Difficulty to imports to fix the error in line 118
+import { Route, Difficulty } from '../types';
 import { AreaChart, Area, ResponsiveContainer, Tooltip } from 'recharts';
 
 declare var L: any;
@@ -30,9 +31,9 @@ const RouteDetail: React.FC<RouteDetailProps> = ({ route, onClose, onStart, onEd
         mapInstance.current = L.map(mapRef.current, {
           zoomControl: false,
           attributionControl: false,
-          dragging: false,
-          touchZoom: false,
-          scrollWheelZoom: false,
+          dragging: true,
+          touchZoom: true,
+          scrollWheelZoom: true,
           fadeAnimation: true
         }).setView([route.path[0].lat, route.path[0].lng], 14);
 
@@ -40,11 +41,12 @@ const RouteDetail: React.FC<RouteDetailProps> = ({ route, onClose, onStart, onEd
 
         const poly = L.polyline(route.path, {
           color: '#3b82f6',
-          weight: 4,
-          opacity: 0.8
+          weight: 6,
+          opacity: 0.9,
+          className: 'route-glow'
         }).addTo(mapInstance.current);
 
-        mapInstance.current.fitBounds(poly.getBounds(), { padding: [20, 20] });
+        mapInstance.current.fitBounds(poly.getBounds(), { padding: [40, 40] });
 
         window.setTimeout(() => {
           if (mapInstance.current) {
@@ -66,108 +68,127 @@ const RouteDetail: React.FC<RouteDetailProps> = ({ route, onClose, onStart, onEd
     };
   }, [route]);
 
-  const elevationData = Array.from({ length: 20 }, (_, i) => ({
-    dist: (i * route.distance / 19).toFixed(1),
-    elev: Math.random() * route.elevationGain
+  const elevationData = Array.from({ length: 24 }, (_, i) => ({
+    dist: (i * route.distance / 23).toFixed(1),
+    elev: 10 + Math.random() * route.elevationGain
   }));
 
   return (
-    <div className="fixed inset-0 z-[60] bg-slate-950 flex flex-col md:max-w-2xl md:mx-auto animate-in slide-in-from-right duration-300">
-      <div className="relative h-72 shrink-0 bg-slate-900">
+    <div className="fixed inset-0 z-[100] bg-[var(--bg-color)] flex flex-col md:max-w-2xl md:mx-auto animate-in slide-in-from-right duration-500 overflow-hidden">
+      {/* Immersive Header Map */}
+      <div className="relative h-[45vh] shrink-0">
         <div ref={mapRef} className="w-full h-full" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[var(--bg-color)] via-transparent to-black/30 pointer-events-none" />
         
-        {!mapReady && (
-          <div className="absolute inset-0 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm z-[10]">
-             <div className="animate-spin h-6 w-6 border-2 border-blue-500 border-t-transparent rounded-full"></div>
-          </div>
-        )}
-
-        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent pointer-events-none" />
         <button 
           onClick={onClose}
-          className="absolute top-6 left-6 bg-slate-900/80 backdrop-blur p-3 rounded-2xl text-white border border-white/10 shadow-xl z-20"
+          className="absolute top-8 left-8 glass p-4 rounded-2xl text-white z-20 active:scale-90 transition-transform"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
+          <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 19l-7-7 7-7" />
           </svg>
         </button>
+
+        {!mapReady && (
+          <div className="absolute inset-0 flex items-center justify-center bg-[var(--bg-color)]/20 backdrop-blur-sm z-[10]">
+             <div className="animate-spin h-10 w-10 border-4 border-[var(--accent-primary)] border-t-transparent rounded-full"></div>
+          </div>
+        )}
       </div>
 
-      <div className="px-8 pb-8 flex-1 overflow-y-auto space-y-8 -mt-6 relative z-10">
-        <div className="space-y-4">
+      {/* Info Body */}
+      <div className="px-8 pb-32 flex-1 overflow-y-auto space-y-10 -mt-12 relative z-10">
+        <div className="space-y-6">
           <div className="flex justify-between items-start">
-            <h2 className="text-3xl font-bold text-white tracking-tight leading-none">{route.name}</h2>
+            <div className="space-y-1">
+              <span className="text-[10px] font-extrabold tracking-[0.4em] uppercase opacity-40">Planned Adventure</span>
+              <h2 className="text-4xl font-extrabold text-[var(--text-main)] tracking-tight leading-none">{route.name}</h2>
+            </div>
             {route.creatorId === 'user_1' && (
               <button 
                 onClick={() => onEdit(route)}
-                className="bg-blue-500/10 text-blue-400 text-[10px] font-bold uppercase tracking-widest px-4 py-2 rounded-xl border border-blue-500/20 active:scale-95 transition-all"
+                className="bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] text-[10px] font-bold uppercase tracking-widest px-5 py-3 rounded-2xl border border-[var(--accent-primary)]/20 hover:bg-[var(--accent-primary)]/20 transition-all"
               >
-                Edit Path
+                Refine Path
               </button>
             )}
           </div>
-          <div className="flex items-center gap-3">
-            <span className="px-3 py-1 bg-emerald-500/10 text-emerald-400 text-[10px] rounded-lg uppercase font-bold tracking-widest border border-emerald-500/20">
-              {route.difficulty}
-            </span>
-            <span className="text-slate-500 text-xs font-medium">Mapped by {route.creatorName}</span>
+          
+          <div className="flex items-center gap-4">
+             <div className={`px-4 py-2 rounded-xl text-[10px] font-extrabold uppercase tracking-widest border ${
+                route.difficulty === Difficulty.HARD ? 'bg-red-500/10 border-red-500/20 text-red-400' : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+             }`}>
+                {route.difficulty} Level
+             </div>
+             <span className="text-xs font-semibold opacity-40">MAPPED BY {route.creatorName.toUpperCase()}</span>
           </div>
-          <p className="text-slate-400 leading-relaxed italic text-sm border-l-2 border-blue-500/50 pl-5">
-            "{route.description}"
+
+          <p className="text-lg opacity-80 leading-relaxed font-medium">
+            {route.description}
           </p>
         </div>
 
+        {/* Stats Grid */}
         <div className="grid grid-cols-2 gap-4">
-          <div className="bg-slate-900/50 p-6 rounded-3xl border border-slate-800/50">
-            <span className="text-slate-500 text-[10px] uppercase font-bold tracking-widest">Distance</span>
-            <div className="text-3xl font-display text-white mt-2">{route.distance} <span className="text-xs text-slate-600">km</span></div>
+          <div className="bg-[var(--card-bg)] p-8 rounded-[2.5rem] border border-[var(--border-color)] group hover:border-[var(--accent-primary)]/30 transition-all">
+            <span className="text-[10px] uppercase font-bold tracking-[0.3em] opacity-40 block mb-2">Distance</span>
+            <div className="text-4xl font-display text-[var(--text-main)]">{route.distance.toFixed(2)} <span className="text-sm opacity-30">KM</span></div>
           </div>
-          <div className="bg-slate-900/50 p-6 rounded-3xl border border-slate-800/50">
-            <span className="text-slate-500 text-[10px] uppercase font-bold tracking-widest">Total Gain</span>
-            <div className="text-3xl font-display text-emerald-400 mt-2">{route.elevationGain} <span className="text-xs text-slate-600">m</span></div>
+          <div className="bg-[var(--card-bg)] p-8 rounded-[2.5rem] border border-[var(--border-color)] group hover:border-[var(--accent-secondary)]/30 transition-all">
+            <span className="text-[10px] uppercase font-bold tracking-[0.3em] opacity-40 block mb-2">Elevation</span>
+            <div className="text-4xl font-display text-[var(--accent-secondary)]">+{route.elevationGain} <span className="text-sm opacity-30">M</span></div>
           </div>
         </div>
 
-        <div>
-          <h3 className="text-[10px] font-bold text-slate-600 uppercase tracking-widest mb-6">Elevation Profile</h3>
-          <div className="h-32 w-full">
+        {/* Chart */}
+        <div className="space-y-6">
+          <div className="flex justify-between items-end px-1">
+            <h3 className="text-xs font-bold uppercase tracking-[0.3em] opacity-40">Path Geometry</h3>
+            <span className="text-[10px] font-bold opacity-30">Vertical Profile (Est.)</span>
+          </div>
+          <div className="h-40 w-full bg-[var(--card-bg)]/30 rounded-[2.5rem] p-6 border border-[var(--border-color)]">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={elevationData}>
                 <defs>
                   <linearGradient id="colorElev" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="var(--accent-secondary)" stopOpacity={0.4}/>
+                    <stop offset="95%" stopColor="var(--accent-secondary)" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
-                <Area type="monotone" dataKey="elev" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorElev)" />
+                <Area type="monotone" dataKey="elev" stroke="var(--accent-secondary)" strokeWidth={4} fillOpacity={1} fill="url(#colorElev)" />
                 <Tooltip 
-                  contentStyle={{ backgroundColor: '#0f172a', border: 'none', borderRadius: '16px', boxShadow: '0 10px 30px rgba(0,0,0,0.5)' }}
-                  itemStyle={{ color: '#10b981', fontWeight: 'bold' }}
+                  cursor={{ stroke: 'rgba(255,255,255,0.1)', strokeWidth: 2 }}
+                  contentStyle={{ backgroundColor: 'var(--bg-color)', border: '1px solid var(--border-color)', borderRadius: '16px', fontSize: '12px' }}
                 />
               </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2 pb-10">
+        {/* Tags */}
+        <div className="flex flex-wrap gap-3 pb-12">
           {route.tags.map(tag => (
-            <span key={tag} className="px-4 py-2 bg-slate-900 text-slate-500 rounded-xl text-[10px] font-bold uppercase tracking-widest border border-slate-800">
+            <span key={tag} className="px-5 py-3 bg-[var(--card-bg)] rounded-2xl text-[10px] font-extrabold uppercase tracking-widest border border-[var(--border-color)]">
               #{tag}
             </span>
           ))}
         </div>
       </div>
 
-      <div className="p-8 bg-slate-950/80 backdrop-blur-2xl border-t border-slate-900">
-        <button 
-          onClick={() => onStart(route)}
-          className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-6 rounded-[2rem] shadow-2xl shadow-blue-900/40 flex items-center justify-center gap-3 active:scale-[0.98] font-display tracking-[0.2em] uppercase"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-          </svg>
-          Record Run
-        </button>
+      {/* Floating Action Bar */}
+      <div className="fixed bottom-0 left-0 right-0 p-8 z-50 md:max-w-2xl md:mx-auto">
+        <div className="glass rounded-[2.5rem] p-4 shadow-2xl">
+          <button 
+            onClick={() => onStart(route)}
+            className="w-full bg-[var(--accent-primary)] hover:brightness-110 text-white font-bold py-6 rounded-3xl flex items-center justify-center gap-4 active:scale-[0.98] transition-all group overflow-hidden relative shadow-2xl shadow-[var(--accent-primary)]/40"
+          >
+            <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+            </svg>
+            <span className="font-display text-2xl tracking-[0.1em] mt-1">START SESSION</span>
+          </button>
+        </div>
       </div>
     </div>
   );
