@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { LatLng, Route, Difficulty, UnitSystem } from '../types';
 import { geminiService } from '../services/geminiService';
@@ -120,7 +121,7 @@ const RouteCreator: React.FC<RouteCreatorProps> = ({ unitSystem, onSave, onCance
     if (!isSnapRef.current) return points;
 
     try {
-      // Sample points more aggressively for smoother matching
+      // Footpath logic: sample enough points to maintain shape but not so many that OSRM times out
       const sampled = points.filter((_, i) => i % 8 === 0 || i === points.length - 1);
       const coords = sampled.map(p => `${p.lng},${p.lat}`).join(';');
       const url = `https://router.project-osrm.org/match/v1/foot/${coords}?overview=full&geometries=geojson&tidy=true`;
@@ -135,6 +136,53 @@ const RouteCreator: React.FC<RouteCreatorProps> = ({ unitSystem, onSave, onCance
       }
     } catch (err) { console.error("OSRM Match Error:", err); }
     return points;
+  };
+
+  const handleFinishFreehand = async () => {
+    if (tracePointsRef.current.length < 5) {
+      setIsTracing(false);
+      tracePointsRef.current = [];
+      if (traceLineRef.current) traceLineRef.current.setLatLngs([]);
+      return;
+    }
+
+    setIsRouting(true);
+    const endOfStroke = tracePointsRef.current[tracePointsRef.current.length - 1];
+    const matchedPath = await matchPointsToRoads(tracePointsRef.current);
+
+    const newId = Math.random().toString(36).substr(2, 9);
+    const currentSegments = segmentsRef.current;
+    
+    let nextSegments: RouteSegment[] = [];
+    if (currentSegments.length > 0) {
+      const last = currentSegments[currentSegments.length - 1];
+      // Bridge the gap from last point to start of new stroke
+      const bridge = await fetchRouteSegment(last.clickPoint, matchedPath[0]);
+      const newSeg: RouteSegment = {
+        id: newId,
+        clickPoint: endOfStroke,
+        pathPoints: [...bridge, ...matchedPath],
+        isSnap: isSnapRef.current
+      };
+      nextSegments = [...currentSegments, newSeg];
+    } else {
+      const firstSeg: RouteSegment = {
+        id: newId,
+        clickPoint: endOfStroke,
+        pathPoints: matchedPath,
+        isSnap: isSnapRef.current
+      };
+      nextSegments = [firstSeg];
+    }
+
+    pushToHistory(nextSegments);
+    setIsTracing(false);
+    tracePointsRef.current = [];
+    if (traceLineRef.current) traceLineRef.current.setLatLngs([]);
+    setIsRouting(false);
+    
+    // Auto-fetch cafes nearby the new segment
+    fetchCoffeeShops(matchedPath);
   };
 
   const fetchCoffeeShops = async (points: LatLng[]) => {
@@ -161,6 +209,7 @@ const RouteCreator: React.FC<RouteCreatorProps> = ({ unitSystem, onSave, onCance
           return newCafes;
         });
 
+        // Enrich with Gemini ratings
         const locationHint = await geminiService.reverseGeocode(mid.lat, mid.lng);
         const ratingsArray = await geminiService.getCafeRatings(foundCafes, locationHint || 'this area');
         
@@ -171,39 +220,6 @@ const RouteCreator: React.FC<RouteCreatorProps> = ({ unitSystem, onSave, onCance
         }));
       }
     } catch (e) { console.error("Cafe loading error:", e); }
-  };
-
-  const handleGpxImport = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      const gpxText = event.target?.result as string;
-      const parser = new DOMParser();
-      const xml = parser.parseFromString(gpxText, "text/xml");
-      const trackPoints = Array.from(xml.querySelectorAll("trkpt")).map(pt => ({
-        lat: parseFloat(pt.getAttribute("lat") || "0"),
-        lng: parseFloat(pt.getAttribute("lon") || "0")
-      }));
-
-      if (trackPoints.length > 0) {
-        const newId = Math.random().toString(36).substr(2, 9);
-        const newSeg: RouteSegment = {
-          id: newId,
-          clickPoint: trackPoints[trackPoints.length - 1],
-          pathPoints: trackPoints,
-          isSnap: false
-        };
-        pushToHistory([newSeg]);
-        if (mapInstance.current) {
-          const bounds = L.latLngBounds(trackPoints.map(p => [p.lat, p.lng]));
-          mapInstance.current.fitBounds(bounds, { padding: [50, 50] });
-        }
-        fetchCoffeeShops(trackPoints);
-      }
-    };
-    reader.readAsText(file);
   };
 
   const handleAddPoint = async (latlng: any) => {
@@ -264,50 +280,6 @@ const RouteCreator: React.FC<RouteCreatorProps> = ({ unitSystem, onSave, onCance
 
     pushToHistory(nextSegments);
     setIsRouting(false);
-  };
-
-  const handleFinishFreehand = async () => {
-    if (tracePointsRef.current.length < 5) {
-      setIsTracing(false);
-      tracePointsRef.current = [];
-      if (traceLineRef.current) traceLineRef.current.setLatLngs([]);
-      return;
-    }
-
-    setIsRouting(true);
-    const endOfStroke = tracePointsRef.current[tracePointsRef.current.length - 1];
-    const matchedPath = await matchPointsToRoads(tracePointsRef.current);
-
-    const newId = Math.random().toString(36).substr(2, 9);
-    const currentSegments = segmentsRef.current;
-    
-    let nextSegments: RouteSegment[] = [];
-    if (currentSegments.length > 0) {
-      const last = currentSegments[currentSegments.length - 1];
-      const bridge = await fetchRouteSegment(last.clickPoint, matchedPath[0]);
-      const newSeg: RouteSegment = {
-        id: newId,
-        clickPoint: endOfStroke,
-        pathPoints: [...bridge, ...matchedPath],
-        isSnap: isSnapRef.current
-      };
-      nextSegments = [...currentSegments, newSeg];
-    } else {
-      const firstSeg: RouteSegment = {
-        id: newId,
-        clickPoint: endOfStroke,
-        pathPoints: matchedPath,
-        isSnap: isSnapRef.current
-      };
-      nextSegments = [firstSeg];
-    }
-
-    pushToHistory(nextSegments);
-    setIsTracing(false);
-    tracePointsRef.current = [];
-    if (traceLineRef.current) traceLineRef.current.setLatLngs([]);
-    setIsRouting(false);
-    fetchCoffeeShops(matchedPath);
   };
 
   const handleClear = () => {
@@ -480,17 +452,16 @@ const RouteCreator: React.FC<RouteCreatorProps> = ({ unitSystem, onSave, onCance
          <button onClick={() => setIsSnapEnabled(!isSnapEnabled)} title="Toggle Magnetic Snap" className={`glass w-16 h-16 rounded-[1.8rem] flex items-center justify-center transition-all ${isSnapEnabled ? 'text-[#d4943a]' : 'text-white/20'}`}>
             <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
          </button>
-         <button onClick={() => fileInputRef.current?.click()} title="Import GPX (from Footpath)" className="glass w-16 h-16 rounded-[1.8rem] flex items-center justify-center text-[#10b981] active:scale-90 transition-all shadow-xl">
-            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0l-4 4m4-4v12" /></svg>
-            <input type="file" ref={fileInputRef} onChange={handleGpxImport} accept=".gpx" className="hidden" />
-         </button>
+         
          <div className="w-px h-4 bg-white/5 mx-auto" />
+         
          <button onClick={handleUndo} disabled={past.length === 0} className="glass w-16 h-16 rounded-[1.8rem] flex items-center justify-center text-white disabled:opacity-10 active:scale-90 transition-all">
             <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" /></svg>
          </button>
          <button onClick={handleRedo} disabled={future.length === 0} className="glass w-16 h-16 rounded-[1.8rem] flex items-center justify-center text-white disabled:opacity-10 active:scale-90 transition-all">
             <svg className="h-6 w-6 scale-x-[-1]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" /></svg>
          </button>
+         
          <button onClick={handleClear} className="glass w-16 h-16 rounded-[1.8rem] flex items-center justify-center text-red-500/60 active:scale-90 transition-all">
             <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
          </button>
