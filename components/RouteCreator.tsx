@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { LatLng, Route, Difficulty, UnitSystem } from '../types';
 import { geminiService } from '../services/geminiService';
@@ -34,10 +33,10 @@ const RouteCreator: React.FC<RouteCreatorProps> = ({ unitSystem, onSave, onCance
   const segmentsRef = useRef<RouteSegment[]>([]);
   const [past, setPast] = useState<RouteSegment[][]>([]);
   const [future, setFuture] = useState<RouteSegment[][]>([]);
+  
   const [isSnapEnabled, setIsSnapEnabled] = useState(true);
   const isSnapRef = useRef(isSnapEnabled);
-  
-  const [isFreehandMode, setIsFreehandMode] = useState(false);
+  const [isFreehandMode, setIsFreehandMode] = useState(true);
   const isFreehandRef = useRef(isFreehandMode);
   
   const [name, setName] = useState(initialRoute?.name || '');
@@ -56,6 +55,7 @@ const RouteCreator: React.FC<RouteCreatorProps> = ({ unitSystem, onSave, onCance
   const traceLineRef = useRef<any>(null);
   const markersRef = useRef<Map<string, any>>(new Map());
   const cafeMarkersRef = useRef<any[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { isSnapRef.current = isSnapEnabled; }, [isSnapEnabled]);
   useEffect(() => { isFreehandRef.current = isFreehandMode; }, [isFreehandMode]);
@@ -68,17 +68,34 @@ const RouteCreator: React.FC<RouteCreatorProps> = ({ unitSystem, onSave, onCance
 
   const pushToHistory = useCallback((newSegments: RouteSegment[]) => {
     setPast(prev => [...prev.slice(-19), segmentsRef.current]);
-    setFuture([]); // Clear future on new action
+    setFuture([]); 
     setSegments(newSegments);
   }, [setSegments]);
+
+  const handleUndo = useCallback(() => {
+    if (past.length === 0) return;
+    const previous = past[past.length - 1];
+    setFuture(prev => [segmentsRef.current, ...prev]);
+    setPast(prev => prev.slice(0, -1));
+    setSegments(previous);
+  }, [past, setSegments]);
+
+  const handleRedo = useCallback(() => {
+    if (future.length === 0) return;
+    const next = future[0];
+    setPast(prev => [...prev, segmentsRef.current]);
+    setFuture(prev => prev.slice(1));
+    setSegments(next);
+  }, [future, setSegments]);
 
   const allPoints = useMemo(() => segments.reduce((acc, seg) => [...acc, ...seg.pathPoints], [] as LatLng[]), [segments]);
   
   const elevationData = useMemo(() => {
     if (allPoints.length === 0) return [];
-    return allPoints.filter((_, i) => i % 10 === 0 || i === allPoints.length - 1).map((p, i) => ({
+    const step = Math.max(1, Math.floor(allPoints.length / 30));
+    return allPoints.filter((_, i) => i % step === 0 || i === allPoints.length - 1).map((p, i) => ({
       dist: i,
-      elev: 10 + (Math.sin(i / 5) * 5) 
+      elev: 10 + (Math.sin(i / 5) * 8) + (Math.cos(i / 3) * 4)
     }));
   }, [allPoints]);
 
@@ -103,7 +120,8 @@ const RouteCreator: React.FC<RouteCreatorProps> = ({ unitSystem, onSave, onCance
     if (!isSnapRef.current) return points;
 
     try {
-      const sampled = points.filter((_, i) => i % 5 === 0 || i === points.length - 1);
+      // Sample points more aggressively for smoother matching
+      const sampled = points.filter((_, i) => i % 8 === 0 || i === points.length - 1);
       const coords = sampled.map(p => `${p.lng},${p.lat}`).join(';');
       const url = `https://router.project-osrm.org/match/v1/foot/${coords}?overview=full&geometries=geojson&tidy=true`;
       const response = await fetch(url);
@@ -115,9 +133,7 @@ const RouteCreator: React.FC<RouteCreatorProps> = ({ unitSystem, onSave, onCance
           lng: coord[0]
         }));
       }
-    } catch (err) {
-      console.error("OSRM Match Error:", err);
-    }
+    } catch (err) { console.error("OSRM Match Error:", err); }
     return points;
   };
 
@@ -125,13 +141,9 @@ const RouteCreator: React.FC<RouteCreatorProps> = ({ unitSystem, onSave, onCance
     if (points.length < 2) return;
     const mid = points[Math.floor(points.length / 2)];
     try {
-      const query = `[out:json];node["amenity"="cafe"](around:400,${mid.lat},${mid.lng});out;`;
+      const query = `[out:json];node["amenity"="cafe"](around:450,${mid.lat},${mid.lng});out;`;
       const response = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`);
-      
       if (!response.ok) return;
-      const contentType = response.headers.get("content-type");
-      if (!contentType || !contentType.includes("application/json")) return;
-
       const data = await response.json();
       if (data.elements && data.elements.length > 0) {
         const foundCafes = data.elements.map((el: any) => ({
@@ -154,13 +166,44 @@ const RouteCreator: React.FC<RouteCreatorProps> = ({ unitSystem, onSave, onCance
         
         setCafes(prev => prev.map(c => {
           const info = ratingsArray.find((r: any) => r.name === c.name);
-          if (info) {
-            return { ...c, rating: info.rating, reviewsCount: info.reviews, googleUrl: info.url };
-          }
+          if (info) return { ...c, rating: info.rating, reviewsCount: info.reviews, googleUrl: info.url };
           return c;
         }));
       }
     } catch (e) { console.error("Cafe loading error:", e); }
+  };
+
+  const handleGpxImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const gpxText = event.target?.result as string;
+      const parser = new DOMParser();
+      const xml = parser.parseFromString(gpxText, "text/xml");
+      const trackPoints = Array.from(xml.querySelectorAll("trkpt")).map(pt => ({
+        lat: parseFloat(pt.getAttribute("lat") || "0"),
+        lng: parseFloat(pt.getAttribute("lon") || "0")
+      }));
+
+      if (trackPoints.length > 0) {
+        const newId = Math.random().toString(36).substr(2, 9);
+        const newSeg: RouteSegment = {
+          id: newId,
+          clickPoint: trackPoints[trackPoints.length - 1],
+          pathPoints: trackPoints,
+          isSnap: false
+        };
+        pushToHistory([newSeg]);
+        if (mapInstance.current) {
+          const bounds = L.latLngBounds(trackPoints.map(p => [p.lat, p.lng]));
+          mapInstance.current.fitBounds(bounds, { padding: [50, 50] });
+        }
+        fetchCoffeeShops(trackPoints);
+      }
+    };
+    reader.readAsText(file);
   };
 
   const handleAddPoint = async (latlng: any) => {
@@ -224,7 +267,7 @@ const RouteCreator: React.FC<RouteCreatorProps> = ({ unitSystem, onSave, onCance
   };
 
   const handleFinishFreehand = async () => {
-    if (tracePointsRef.current.length < 3) {
+    if (tracePointsRef.current.length < 5) {
       setIsTracing(false);
       tracePointsRef.current = [];
       if (traceLineRef.current) traceLineRef.current.setLatLngs([]);
@@ -267,22 +310,6 @@ const RouteCreator: React.FC<RouteCreatorProps> = ({ unitSystem, onSave, onCance
     fetchCoffeeShops(matchedPath);
   };
 
-  const handleUndo = useCallback(() => {
-    if (past.length === 0) return;
-    const previous = past[past.length - 1];
-    setFuture(prev => [segmentsRef.current, ...prev]);
-    setPast(prev => prev.slice(0, -1));
-    setSegments(previous);
-  }, [past, setSegments]);
-
-  const handleRedo = useCallback(() => {
-    if (future.length === 0) return;
-    const next = future[0];
-    setPast(prev => [...prev, segmentsRef.current]);
-    setFuture(prev => prev.slice(1));
-    setSegments(next);
-  }, [future, setSegments]);
-
   const handleClear = () => {
     pushToHistory([]);
     setCafes([]);
@@ -309,7 +336,7 @@ const RouteCreator: React.FC<RouteCreatorProps> = ({ unitSystem, onSave, onCance
       
       const icon = L.divIcon({
         className: 'route-anchor',
-        html: `<div style="background: ${isStart ? '#d4943a' : (isEnd ? '#f5e6d0' : 'white')}; width: ${isEnd || isStart ? '24px' : '10px'}; height: ${isEnd || isStart ? '24px' : '10px'}; border-radius: 50%; border: 3px solid #1a1210; box-shadow: 0 4px 15px rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 10px; color: #1a1210;">${isStart ? 'S' : (isEnd ? 'E' : '')}</div>`,
+        html: `<div style="background: ${isStart ? '#d4943a' : (isEnd ? '#f5e6d0' : 'white')}; width: ${isEnd || isStart ? '24px' : '12px'}; height: ${isEnd || isStart ? '24px' : '12px'}; border-radius: 50%; border: 3px solid #1a1210; box-shadow: 0 4px 15px rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 10px; color: #1a1210;">${isStart ? 'S' : (isEnd ? 'E' : '')}</div>`,
         iconSize: [24, 24],
         iconAnchor: [12, 12]
       });
@@ -329,45 +356,24 @@ const RouteCreator: React.FC<RouteCreatorProps> = ({ unitSystem, onSave, onCance
 
     cafeMarkersRef.current.forEach(m => m.remove());
     cafeMarkersRef.current = cafes.map(cafe => {
-      const cafeName = cafe.name;
       const icon = L.divIcon({
         className: 'cafe-marker',
         html: `
-          <div class="relative">
-            <div class="glass" style="width: 46px; height: 46px; border-radius: 18px; display: flex; align-items: center; justify-content: center; font-size: 24px; border: 2.5px solid #d4943a; box-shadow: 0 8px 32px rgba(0,0,0,0.8); transition: all 0.3s ease;">☕</div>
-            ${cafe.rating ? `
-              <div class="absolute -top-3 -right-3 bg-amber-400 text-black text-[9px] font-black px-2 py-1 rounded-lg border-2 border-[#1a1210] shadow-lg flex items-center gap-0.5">
-                ⭐ ${cafe.rating}
-              </div>
-            ` : ''}
+          <div class="relative scale-in-center">
+            <div class="glass" style="width: 48px; height: 48px; border-radius: 20px; display: flex; align-items: center; justify-content: center; font-size: 26px; border: 2.5px solid #d4943a; box-shadow: 0 10px 40px rgba(0,0,0,0.8);">☕</div>
+            ${cafe.rating ? `<div class="absolute -top-3 -right-3 bg-amber-400 text-black text-[9px] font-black px-2 py-1 rounded-lg border-2 border-[#1a1210] shadow-lg">⭐ ${cafe.rating}</div>` : ''}
           </div>
         `,
-        iconSize: [46, 46],
-        iconAnchor: [23, 23]
+        iconSize: [48, 48],
+        iconAnchor: [24, 24]
       });
       const marker = L.marker([cafe.lat, cafe.lng], { icon }).addTo(mapInstance.current);
-      
       marker.bindTooltip(`
-        <div style="background: #1a1210; color: #f5e6d0; padding: 8px 14px; border-radius: 12px; border: 1.5px solid #d4943a; font-family: 'Plus Jakarta Sans', sans-serif; box-shadow: 0 8px 24px rgba(0,0,0,0.6);">
-          <div class="font-bold text-sm mb-1">${cafeName}</div>
-          ${cafe.rating ? `<div class="text-[10px] flex items-center gap-1.5 font-bold text-amber-400">⭐ ${cafe.rating} <span class="opacity-40 text-white font-normal">(${cafe.reviewsCount})</span></div>` : '<div class="text-[10px] opacity-40">Fetching details...</div>'}
+        <div style="background: #1a1210; color: #f5e6d0; padding: 10px 16px; border-radius: 14px; border: 1.5px solid #d4943a; font-family: 'Plus Jakarta Sans', sans-serif; box-shadow: 0 12px 32px rgba(0,0,0,0.6);">
+          <div class="font-bold text-sm mb-1">${cafe.name}</div>
+          ${cafe.rating ? `<div class="text-[10px] flex items-center gap-1.5 font-bold text-amber-400">⭐ ${cafe.rating} <span class="opacity-40 text-white font-normal">(${cafe.reviewsCount})</span></div>` : '<div class="text-[10px] opacity-40 italic">Rating loading...</div>'}
         </div>
-      `, { direction: 'top', offset: [0, -25], opacity: 1 });
-
-      marker.bindPopup(`
-        <div class="p-4 space-y-3 text-[#f5e6d0] font-sans min-w-[180px]">
-          <h4 class="text-xl font-bold border-b border-[#d4943a]/30 pb-2">${cafeName}</h4>
-          ${cafe.rating ? `
-            <div class="flex flex-col gap-1">
-              <div class="text-xs font-bold text-amber-400 uppercase tracking-tighter">Google Rating: ⭐ ${cafe.rating}</div>
-              <div class="text-[10px] opacity-60">Based on ${cafe.reviewsCount} reviews</div>
-              <a href="${cafe.googleUrl}" target="_blank" class="text-[10px] text-[#d4943a] underline hover:text-white transition-colors mt-1">View on Google Maps</a>
-            </div>
-          ` : '<div class="text-xs opacity-40 italic">Finding the perfect roast details...</div>'}
-          <button class="w-full bg-[#d4943a] text-[#1a1210] font-black text-[11px] py-3 rounded-xl mt-3 uppercase tracking-widest shadow-lg active:scale-95 transition-all">Add to Route</button>
-        </div>
-      `);
-
+      `, { direction: 'top', offset: [0, -28], opacity: 1 });
       return marker;
     });
 
@@ -408,35 +414,23 @@ const RouteCreator: React.FC<RouteCreatorProps> = ({ unitSystem, onSave, onCance
     mapInstance.current.on('mousemove', (e: any) => {
       if (isTracing) {
         const last = tracePointsRef.current[tracePointsRef.current.length - 1];
-        if (!last || L.latLng(last).distanceTo(e.latlng) > 8) {
+        if (!last || L.latLng(last).distanceTo(e.latlng) > 6) {
           tracePointsRef.current.push(e.latlng);
           traceLineRef.current.setLatLngs(tracePointsRef.current);
         }
       }
     });
 
-    mapInstance.current.on('mouseup', () => {
-      if (isTracing) {
-        handleFinishFreehand();
-      }
-    });
-
-    mapInstance.current.on('click', (e: any) => {
-      if (!isFreehandRef.current && !isTracing) {
-        handleAddPoint(e.latlng);
-      }
-    });
+    mapInstance.current.on('mouseup', () => { if (isTracing) handleFinishFreehand(); });
+    mapInstance.current.on('click', (e: any) => { if (!isFreehandRef.current && !isTracing) handleAddPoint(e.latlng); });
 
     return () => { if (mapInstance.current) mapInstance.current.remove(); };
   }, []);
 
   useEffect(() => {
     if (mapInstance.current) {
-      if (isFreehandMode) {
-        mapInstance.current.dragging.disable();
-      } else {
-        mapInstance.current.dragging.enable();
-      }
+      if (isFreehandMode) mapInstance.current.dragging.disable();
+      else mapInstance.current.dragging.enable();
     }
   }, [isFreehandMode]);
 
@@ -453,24 +447,22 @@ const RouteCreator: React.FC<RouteCreatorProps> = ({ unitSystem, onSave, onCance
     setIsSaving(false);
   };
 
-  const timeEst = {
-    walk: Math.round(distance * 12),
-    jog: Math.round(distance * 9),
-    run: Math.round(distance * 7)
-  };
-
   return (
     <div className="fixed inset-0 z-[110] bg-[#1a1210] flex flex-col overflow-hidden animate-in fade-in duration-500">
-      <div ref={mapRef} className={`flex-1 ${isFreehandMode ? 'cursor-pencil' : 'cursor-crosshair'}`} style={{ cursor: isFreehandMode ? 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'24\' height=\'24\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'white\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'%3E%3Cpath d=\'M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z\'%3E%3C/path%3E%3C/svg%3E") 0 24, crosshair' : 'crosshair' }} />
+      <div 
+        ref={mapRef} 
+        className="flex-1" 
+        style={{ cursor: isFreehandMode ? 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'24\' height=\'24\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'white\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'%3E%3Cpath d=\'M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z\'%3E%3C/path%3E%3C/svg%3E") 0 24, crosshair' : 'crosshair' }} 
+      />
       
       {isRouting && (
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[2000] glass px-10 py-5 rounded-[2rem] flex items-center gap-4 animate-pulse">
-           <div className="w-5 h-5 border-2 border-[#d4943a] border-t-transparent rounded-full animate-spin" />
-           <span className="text-[10px] font-black uppercase tracking-[0.4em] text-[#d4943a]">Roasting Path...</span>
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[2000] glass px-12 py-6 rounded-[3rem] flex items-center gap-4 animate-pulse border-amber-400/20">
+           <div className="w-6 h-6 border-3 border-[#d4943a] border-t-transparent rounded-full animate-spin" />
+           <span className="text-xs font-black uppercase tracking-[0.5em] text-[#d4943a]">Magnetic Snapping...</span>
         </div>
       )}
 
-      {/* Top Header Controls */}
+      {/* Header */}
       <div className="absolute top-12 left-8 right-8 z-[1000] flex gap-4">
         <button onClick={onCancel} className="glass w-16 h-16 rounded-[1.8rem] flex items-center justify-center text-white active:scale-90 transition-all shadow-2xl">
           <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 19l-7-7 7-7" /></svg>
@@ -480,95 +472,71 @@ const RouteCreator: React.FC<RouteCreatorProps> = ({ unitSystem, onSave, onCance
         </div>
       </div>
 
-      {/* Side Toolbar */}
+      {/* Sidebar Controls */}
       <div className="absolute top-32 right-8 flex flex-col gap-4 z-[1000]">
-         <button 
-           onClick={() => setIsFreehandMode(!isFreehandMode)} 
-           title="Freehand Draw Mode" 
-           className={`glass w-16 h-16 rounded-[1.8rem] flex items-center justify-center transition-all ${isFreehandMode ? 'text-[#d4943a] ring-2 ring-[#d4943a]/50' : 'text-white/40'}`}
-         >
-            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-            </svg>
+         <button onClick={() => setIsFreehandMode(!isFreehandMode)} title="Footpath Drawing Mode" className={`glass w-16 h-16 rounded-[1.8rem] flex items-center justify-center transition-all ${isFreehandMode ? 'text-[#d4943a] ring-2 ring-[#d4943a]/50 bg-amber-400/5' : 'text-white/40'}`}>
+            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
          </button>
-
-         <button onClick={() => setIsSnapEnabled(!isSnapEnabled)} title="Toggle Snap-to-Road" className={`glass w-16 h-16 rounded-[1.8rem] flex items-center justify-center transition-all ${isSnapEnabled ? 'text-[#d4943a]' : 'text-white/20'}`}>
+         <button onClick={() => setIsSnapEnabled(!isSnapEnabled)} title="Toggle Magnetic Snap" className={`glass w-16 h-16 rounded-[1.8rem] flex items-center justify-center transition-all ${isSnapEnabled ? 'text-[#d4943a]' : 'text-white/20'}`}>
             <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
          </button>
-         
-         <div className="flex flex-col gap-2">
-           <button onClick={handleUndo} disabled={past.length === 0} title="Undo last action" className="glass w-16 h-16 rounded-[1.8rem] flex items-center justify-center text-white disabled:opacity-10 active:scale-90 transition-all">
-              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" /></svg>
-           </button>
-           <button onClick={handleRedo} disabled={future.length === 0} title="Redo action" className="glass w-16 h-16 rounded-[1.8rem] flex items-center justify-center text-white disabled:opacity-10 active:scale-90 transition-all">
-              <svg className="h-6 w-6 scale-x-[-1]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" /></svg>
-           </button>
-         </div>
-
-         <button onClick={handleClear} title="Clear all" className="glass w-16 h-16 rounded-[1.8rem] flex items-center justify-center text-red-400 active:scale-90 transition-all">
-            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
+         <button onClick={() => fileInputRef.current?.click()} title="Import GPX (from Footpath)" className="glass w-16 h-16 rounded-[1.8rem] flex items-center justify-center text-[#10b981] active:scale-90 transition-all shadow-xl">
+            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0l-4 4m4-4v12" /></svg>
+            <input type="file" ref={fileInputRef} onChange={handleGpxImport} accept=".gpx" className="hidden" />
+         </button>
+         <div className="w-px h-4 bg-white/5 mx-auto" />
+         <button onClick={handleUndo} disabled={past.length === 0} className="glass w-16 h-16 rounded-[1.8rem] flex items-center justify-center text-white disabled:opacity-10 active:scale-90 transition-all">
+            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" /></svg>
+         </button>
+         <button onClick={handleRedo} disabled={future.length === 0} className="glass w-16 h-16 rounded-[1.8rem] flex items-center justify-center text-white disabled:opacity-10 active:scale-90 transition-all">
+            <svg className="h-6 w-6 scale-x-[-1]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" /></svg>
+         </button>
+         <button onClick={handleClear} className="glass w-16 h-16 rounded-[1.8rem] flex items-center justify-center text-red-500/60 active:scale-90 transition-all">
+            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
          </button>
       </div>
 
-      {/* Floating Instructions */}
+      {/* Floating Indicator */}
       {segments.length === 0 && (
-        <div className="absolute top-[30%] left-1/2 -translate-x-1/2 z-[1001] pointer-events-none text-center space-y-4">
-           <div className="glass px-10 py-12 rounded-[4rem] border-amber-900/20 shadow-3xl">
-              <h3 className="text-4xl font-display font-black text-white leading-none uppercase">{isFreehandMode ? 'Draw path' : 'Place pins'}</h3>
-              <p className="text-[9px] font-bold uppercase tracking-[0.4em] opacity-40 mt-3">
-                {isFreehandMode ? 'Hold and drag to trace your route' : 'Tap map to place anchor points'}
+        <div className="absolute top-[35%] left-1/2 -translate-x-1/2 z-[1001] pointer-events-none text-center">
+           <div className="glass px-12 py-14 rounded-[4rem] border-amber-900/20 shadow-3xl animate-bounce">
+              <h3 className="text-4xl font-display font-black text-white leading-none uppercase">{isFreehandMode ? 'Trace Path' : 'Place Pins'}</h3>
+              <p className="text-[10px] font-bold uppercase tracking-[0.4em] opacity-40 mt-4">
+                {isFreehandMode ? 'Draw your route like Footpath' : 'Tap to place specific points'}
               </p>
            </div>
         </div>
       )}
 
-      {/* Stats Bottom Panel */}
+      {/* Stats Panel */}
       <div className="absolute bottom-10 left-8 right-8 z-[1000] glass p-8 rounded-[3.5rem] shadow-3xl border-amber-900/10 space-y-6">
         <div className="flex justify-between items-end">
           <div className="space-y-1">
-            <span className="text-[9px] font-black uppercase tracking-[0.5em] opacity-30">Total Batch</span>
+            <span className="text-[10px] font-black uppercase tracking-[0.5em] opacity-30">Total Batch</span>
             <div className="text-6xl font-display text-white tracking-tighter leading-none">
               {formatDistance(distance, unitSystem).value} <span className="text-xl opacity-20">{formatDistance(distance, unitSystem).unit}</span>
             </div>
           </div>
-          <div className="flex flex-col items-end gap-1">
-            <div className="flex gap-4">
-               <div className="text-right">
-                  <span className="text-[7px] font-black uppercase tracking-widest opacity-20">Walk</span>
-                  <div className="text-xs font-bold text-[#f5e6d0]">{timeEst.walk}m</div>
-               </div>
-               <div className="text-right border-x border-white/5 px-4">
-                  <span className="text-[7px] font-black uppercase tracking-widest opacity-20">Jog</span>
-                  <div className="text-xs font-bold text-[#d4943a]">{timeEst.jog}m</div>
-               </div>
-               <div className="text-right">
-                  <span className="text-[7px] font-black uppercase tracking-widest opacity-20">Run</span>
-                  <div className="text-xs font-bold text-[#10b981]">{timeEst.run}m</div>
-               </div>
-            </div>
-            <div className="text-right pt-2">
-              <span className="text-[9px] font-black uppercase tracking-[0.4em] opacity-30">Climb</span>
-              <div className="text-3xl font-display text-[#d4943a] leading-none">
+          <div className="text-right">
+             <span className="text-[10px] font-black uppercase tracking-[0.4em] opacity-30">Elevation Gain</span>
+             <div className="text-3xl font-display text-[#d4943a] leading-none">
                 +{formatElevation(distance * 12, unitSystem).value}<span className="text-sm opacity-20 ml-1">{formatElevation(distance * 12, unitSystem).unit}</span>
               </div>
-            </div>
           </div>
         </div>
-
-        <div className="h-12 w-full">
+        <div className="h-16 w-full">
            <ResponsiveContainer width="100%" height="100%">
              <AreaChart data={elevationData}>
-               <Area type="monotone" dataKey="elev" stroke="#d4943a" fill="#d4943a" fillOpacity={0.1} strokeWidth={3} />
+               <Area type="monotone" dataKey="elev" stroke="#d4943a" fill="#d4943a" fillOpacity={0.1} strokeWidth={4} />
              </AreaChart>
            </ResponsiveContainer>
         </div>
-
         <button 
           disabled={distance === 0 || !name || isSaving} 
           onClick={handleSave} 
-          className="w-full bg-[#d4943a] text-[#1a1210] font-black py-7 rounded-[2rem] shadow-2xl disabled:opacity-20 uppercase font-display text-2xl tracking-[0.2em] active:scale-[0.98] transition-all shadow-amber-900/40"
+          className="w-full bg-[#d4943a] text-[#1a1210] font-black py-7 rounded-[2.2rem] shadow-2xl disabled:opacity-20 uppercase font-display text-2xl tracking-[0.2em] active:scale-[0.98] transition-all shadow-amber-900/40"
         >
-          {isSaving ? 'SEALING BAG...' : 'FINALIZE BREW'}
+          {isSaving ? 'Sealing Brew...' : 'Finalize Path'}
         </button>
       </div>
     </div>

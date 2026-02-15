@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 import { Route, RunHistory, LatLng } from "../types";
 
@@ -50,6 +49,7 @@ export const geminiService = {
   },
 
   // Fetch cafe ratings using Google Search grounding
+  // Refactored to use Type.ARRAY of Type.OBJECT with specific properties to fix API schema error
   async getCafeRatings(cafes: { name: string; id: string }[], locationHint: string): Promise<any[]> {
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -66,10 +66,10 @@ export const geminiService = {
             items: {
               type: Type.OBJECT,
               properties: {
-                name: { type: Type.STRING },
-                rating: { type: Type.NUMBER },
-                reviews: { type: Type.STRING },
-                url: { type: Type.STRING }
+                name: { type: Type.STRING, description: "The name of the cafe" },
+                rating: { type: Type.NUMBER, description: "The 1-5 star rating" },
+                reviews: { type: Type.STRING, description: "Formatted review count" },
+                url: { type: Type.STRING, description: "Google Maps URL" }
               },
               required: ["name", "rating", "reviews", "url"]
             }
@@ -81,7 +81,8 @@ export const geminiService = {
         console.debug('Cafe Search Grounding Chunks:', response.candidates[0].groundingMetadata.groundingChunks);
       }
 
-      return JSON.parse(response.text.trim());
+      const jsonStr = response.text.trim();
+      return JSON.parse(jsonStr);
     } catch (e) {
       console.error('Error fetching cafe ratings:', e);
       return [];
@@ -89,17 +90,15 @@ export const geminiService = {
   },
 
   // Generate an engaging description for a new route
-  async generateRouteDescription(name: string, distance: number, elevation: number, tags: string[]): Promise<string> {
+  async generateRouteDescription(name: string, distance: number, elevation: number, cafeNames: string[]): Promise<string> {
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      const isCoffee = tags.some(t => t.toLowerCase().includes('coffee') || t.toLowerCase().includes('cafe'));
-      const prompt = isCoffee 
+      const prompt = cafeNames.length > 0
         ? `Write a short, engaging 2-sentence description for a coffee-themed running route named "${name}". 
            It is ${distance}km long with ${elevation}m elevation gain. 
-           Tags: ${tags.join(', ')}. Mention why this is a great destination for a coffee lover.`
+           It passes by: ${cafeNames.join(', ')}. Mention why this is a great destination for a coffee lover.`
         : `Write a short, engaging 2-sentence description for a running route named "${name}". 
-           It is ${distance}km long with ${elevation}m elevation gain. 
-           Tags: ${tags.join(', ')}. Focus on the vibe and why every run deserves a destination.`;
+           It is ${distance}km long with ${elevation}m elevation gain. Focus on the vibe and why every run deserves a destination.`;
 
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
